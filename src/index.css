@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --font-poppins: "Poppins", sans-serif;
+  --color-primary: #f7ba34;
+  --color-secondary: #69a79c;
+  --color-light: #f7f7f7;
+  --color-dark: #333333;
+  --color-dark2: #999999;
+}
+@layer components {
+  .primary-btn {
+    /* @apply directive remains the same */
+    @apply inline-block bg-primary text-white font-semibold rounded-lg
+           hover:bg-secondary duration-200
+           shadow-[0px_10px_8px_-7px_var(--color-primary)] /* Use CSS variable for shadow color */
+           hover:shadow-[0px_10px_8px_-7px_var(--color-secondary)] /* Use CSS variable for shadow color */
+           py-2 px-6;
+  }
+}
+
+@layer utilities {
+  .drop-shadow {
+    filter: drop-shadow(6px 8px 10px rgba(0, 0, 0, 0.5));
+  }
+}
+
+.container {
+  /* Default padding for all breakpoints, unless overridden below */
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Small breakpoint (sm) - 640px by default in Tailwind */
+@media (min-width: 640px) {
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Large breakpoint (lg) - 1024px by default in Tailwind */
+@media (min-width: 1024px) {
+  .container {
+    padding-left: 4rem;
+    padding-right: 4rem;
+  }
+}
+
+/* Extra Large breakpoint (xl) - 1280px by default in Tailwind */
+@media (min-width: 1280px) {
+  .container {
+    padding-left: 5rem;
+    padding-right: 5rem;
+  }
+}
+
+/* 2XL breakpoint (2xl) - 1536px by default in Tailwind */
+@media (min-width: 1536px) {
+  .container {
+    padding-left: 6rem;
+    padding-right: 6rem;
+  }
+}
+
+body {
+  font-family: var(--font-poppins);
+}
