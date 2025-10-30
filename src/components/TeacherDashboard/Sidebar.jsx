@@ -58,8 +58,8 @@ const Sidebar = () => {
           </li>
 
           <li>
-            <a
-              href="#"
+            <Link
+              to = "/TeacherPage/manage-thematic-learning-mode"
               className="relative flex flex-row items-center h-11 focus:outline-none hover:bg-[#FCC636] text-black hover:text-white border-l-4 border-transparent hover:border-[#FCC636] pr-6"
             >
               <span className="inline-flex justify-center items-center ml-4">
@@ -69,7 +69,7 @@ const Sidebar = () => {
               </span>
               <span className="ml-2 text-sm tracking-wide truncate">Create Word Lists</span>
               {/* <span className="hidden md:block px-2 py-0.5 ml-auto text-xs font-medium tracking-wide text-red-500 bg-red-50 rounded-full">1.2k</span> */}
-            </a>
+            </Link>
           </li>
 
           {/* Settings Section Title */}

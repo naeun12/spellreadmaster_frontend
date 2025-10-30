@@ -1,12 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import ConfirmLogoutModal from '../ConfirmLogoutModal';
 
 const Header = () => {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
+  const [displayName, setDisplayName] = useState('Loading...');
+
+  // Fetch teacher name from 'teachers' collection
+  useEffect(() => {
+    const fetchTeacherName = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setDisplayName('Guest');
+        return;
+      }
+
+      try {
+        const teacherDoc = await getDoc(doc(db, 'teachers', user.uid));
+        if (teacherDoc.exists()) {
+          const name = teacherDoc.data().fullName;
+          setDisplayName(name || 'Teacher');
+        } else {
+          // Fallback if doc doesn't exist
+          setDisplayName(user.email?.split('@')[0] || 'Teacher');
+        }
+      } catch (error) {
+        console.error('Error fetching teacher name:', error);
+        setDisplayName('Teacher');
+      }
+    };
+
+    fetchTeacherName();
+  }, []);
 
   const handleLogout = () => {
     setShowModal(true);
@@ -21,36 +50,25 @@ const Header = () => {
     }
   };
 
-
   return (
-    <header className="fixed w-full flex items-center justify-between h-14 text-white z-10 bg-[#FCC636] ">
+    <header className="fixed w-full flex items-center justify-between h-14 text-white z-10 bg-[#FCC636]">
       {/* Left Section */}
       <div className="flex items-center justify-start md:justify-center pl-3 w-14 md:w-64 h-14">
         <img
-          src="https://i.pravatar.cc/150?img=13" 
+          src="https://i.pravatar.cc/150?img=13"
           alt=""
           className="w-7 h-7 md:w-10 md:h-10 mr-2 rounded-md overflow-hidden"
         />
-        <span className="hidden md:block ml-2">Teacher Hans</span>
+        <span className="hidden md:block ml-2">{displayName}</span>
       </div>
 
-      {/* Right Section - Full width container */}
+      {/* Right Section */}
       <div className="flex-1 flex justify-between items-center h-14 px-4">
         {/* Search Bar */}
-        <div className="bg-white rounded flex items-center w-full sm:w-96 lg:w-1/2 xl:w-2/3 mr-4 p-2 shadow-sm border border-gray-200 dark:border-gray-600">
+        <div className="bg-white rounded flex items-center w-full sm:w-96 lg:w-1/2 xl:w-2/3 mr-4 p-2 shadow-sm border border-gray-200">
           <button className="outline-none focus:outline-none">
-            <svg
-              className="w-5 text-gray-600 h-5 cursor-pointer"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              ></path>
+            <svg className="w-5 text-gray-600 h-5 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </button>
           <input
@@ -60,16 +78,11 @@ const Header = () => {
           />
         </div>
 
-        {/* Theme Toggle & Logout Button */}
+        {/* Logout */}
         <ul className="flex items-center space-x-4">
-          
-
-          {/* Divider */}
           <li>
             <div className="block w-px h-6 mx-3 bg-white"></div>
           </li>
-
-          {/* Logout Link */}
           <li>
             <button
               onClick={handleLogout}
@@ -78,26 +91,18 @@ const Header = () => {
             >
               <span className="inline-flex mr-1">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  ></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
               </span>
               Logout
             </button>
-            {/* Render Modal if showModal is true */}
             {showModal && (
               <ConfirmLogoutModal
-                onConfirm={() => {
-                  confirmLogout();
-                }}
+                onConfirm={confirmLogout}
                 onCancel={() => setShowModal(false)}
               />
             )}
-         </li>
+          </li>
         </ul>
       </div>
     </header>

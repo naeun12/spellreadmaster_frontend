@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, Play, Sparkles } from 'lucide-react';
-import { db, collection, getDocs } from '../../firebase';
+import { db, auth, collection, getDocs, addDoc, serverTimestamp } from '../../firebase';
 
 const StudentSM = () => {
   const [stories, setStories] = useState([]);
@@ -15,6 +15,8 @@ const StudentSM = () => {
   const [userAnswers, setUserAnswers] = useState([]);
   const [quizFinished, setQuizFinished] = useState(false);
 
+  const saveCompletedRef = useRef(false);
+
   const handleQuizAnswer = (answerIndex) => {
   const newAnswers = [...userAnswers];
   newAnswers[currentQuestionIndex] = answerIndex;
@@ -27,6 +29,10 @@ const StudentSM = () => {
     setQuizFinished(true);
   }
 };
+
+  useEffect(() => {
+  console.log("👤 Current user:", auth.currentUser);
+}, []);
 
   // Load stories from Firestore
   useEffect(() => {
@@ -46,6 +52,39 @@ const StudentSM = () => {
     };
     fetchStories();
   }, []);
+
+  useEffect(() => {
+    console.log("🔍 useEffect triggered:", {
+    quizFinished,
+    currentQuizStory: currentQuizStory?.storyName,
+    userAnswersLength: userAnswers.length,
+    saveCompleted: saveCompletedRef.current
+  });
+    if (
+      quizFinished &&
+      currentQuizStory &&
+      userAnswers.length > 0 &&
+      !saveCompletedRef.current // ✅ Only save once per quiz
+    ) {
+      console.log("✅ Conditions met — saving score...");
+      saveStoryQuizScore(currentQuizStory, userAnswers);
+      saveCompletedRef.current = true; // ✅ Mark as saved
+    }
+  }, [quizFinished, currentQuizStory, userAnswers]);
+
+  // Reset ref when starting a new quiz
+  const startNewQuiz = (story) => {
+    if (!story.questions || story.questions.length === 0) {
+    console.warn("❌ Cannot start quiz: no questions");
+    return;
+  }
+    setCurrentQuizStory(story);
+    setUserAnswers(Array(story.questions.length).fill(null));
+    setCurrentQuestionIndex(0);
+    setQuizFinished(false);
+    saveCompletedRef.current = false; // ✅ Reset for next quiz
+    setShowQuizModal(true);
+  };
 
   // Function to open the Chapters Modal
   const openChaptersModal = (chapters, storyName) => {
@@ -83,6 +122,54 @@ const StudentSM = () => {
       ? `https://www.youtube.com/watch?v=${videoId}&autoplay=1&cc_load_policy=1`
       : '#';
   };
+
+  const saveStoryQuizScore = async (story, answers) => {
+  try {
+    // ✅ 1. Check authentication first
+    if (!auth.currentUser) {
+      console.error("❌ Cannot save score: no authenticated user");
+      return;
+    }
+
+    const studentId = auth.currentUser.uid;
+    const total = story?.questions?.length || 0;
+
+    // ✅ 2. Validate input
+    if (total === 0 || !Array.isArray(answers) || answers.length !== total) {
+      console.error("❌ Invalid quiz data", { story, answers });
+      return;
+    }
+
+    // ✅ 3. Calculate score safely
+    const correctCount = answers.reduce((acc, ans, i) => {
+      const correctAnswer = story.questions[i]?.correctAnswer;
+      return ans === correctAnswer ? acc + 1 : acc;
+    }, 0);
+
+    // ✅ 4. Save to Firestore
+    await addDoc(collection(db, 'students', studentId, 'activity'), {
+      mode: 'story',
+      storyId: story.id || 'unknown',
+      storyTitle: story.storyName || 'Untitled Story',
+      score: correctCount,
+      maxScore: total,
+      percentage: total > 0 ? Math.round((correctCount / total) * 100) : 0,
+      timestamp: serverTimestamp(),
+      completed: true,
+      answers: answers.map((selectedOption, i) => ({
+        question: story.questions[i]?.question || '',
+        selectedOption,
+        correct: selectedOption === (story.questions[i]?.correctAnswer ?? -1),
+        correctAnswerIndex: story.questions[i]?.correctAnswer ?? -1,
+        options: story.questions[i]?.options || []
+      }))
+    });
+
+    console.log("✅ Story quiz score saved successfully!", { studentId, storyId: story.id, score: correctCount });
+  } catch (error) {
+    console.error("💥 Failed to save story quiz score:", error);
+  }
+};
 
   if (loading) {
     return (
@@ -213,13 +300,7 @@ const StudentSM = () => {
                     {story.questions && story.questions.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setCurrentQuizStory(story);
-                          setUserAnswers(Array(story.questions.length).fill(null));
-                          setCurrentQuestionIndex(0);
-                          setQuizFinished(false);
-                          setShowQuizModal(true);
-                        }}
+                        onClick={() => startNewQuiz(story)} // ✅ Clean and clear
                         className="mt-3 w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold rounded-xl py-3 px-4 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                       >
                         <Sparkles className="w-5 h-5" />
@@ -409,6 +490,7 @@ const StudentSM = () => {
                         const score = userAnswers.reduce((acc, ans, i) => {
                           return ans === currentQuizStory.questions[i].correctAnswer ? acc + 1 : acc;
                         }, 0);
+
                         return (
                           <div className="mb-6">
                             <div className="text-5xl mb-3">🎉</div>

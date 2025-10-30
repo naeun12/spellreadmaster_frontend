@@ -1,7 +1,7 @@
 import React from 'react';
 import { auth, db } from '../firebase'; // adjust path as needed
 import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 import { Volume2, Check, X } from 'lucide-react';
 
@@ -71,6 +71,41 @@ const StudentPreTest = ({ onComplete }) => {
       window.speechSynthesis.speak(utterance);
     }
   };
+
+  const savePreTestScore = async (finalResults) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.error("❌ No authenticated user");
+      return;
+    }
+
+    await addDoc(collection(db, 'students', user.uid, 'activity'), {
+      mode: 'pretest',
+      timestamp: serverTimestamp(),
+      completed: true,
+      
+      // From finalResults
+      score: finalResults.score,
+      totalQuestions: finalResults.totalQuestions,
+      totalPoints: finalResults.totalPoints,
+      level: finalResults.level,
+      
+      // Optional: store full results for debugging or review
+      answers: finalResults.results.map(r => ({
+        word: r.word,
+        userAnswer: r.userAnswer,
+        correct: r.correct,
+        difficulty: r.difficulty,
+        points: r.points
+      }))
+    });
+
+    console.log("✅ Pre-test score saved successfully!");
+  } catch (error) {
+    console.error("💥 Failed to save pre-test score:", error);
+  }
+};
 
   // Auto-play word when question loads
   useEffect(() => {
@@ -308,12 +343,12 @@ const StudentPreTest = ({ onComplete }) => {
           </div>
 
           <button
-            onClick={async() => {
-              // You can add navigation logic here
-              await markFirstLoginComplete(); // ✅ Mark first login as done
-              // Then navigate to StudentPage
-              navigate('/StudentPage');
-              console.log('Navigate to dashboard with results:', finalResults);
+            onClick={async () => {
+              if (finalResults) {
+                await savePreTestScore(finalResults); // ✅ Save first
+                await markFirstLoginComplete();
+                navigate('/StudentPage');
+              }
             }}
             className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-2xl text-xl font-bold hover:from-blue-600 hover:to-purple-700 transform hover:scale-105 transition-all shadow-lg"
           >

@@ -11,6 +11,7 @@ import Dashboard from './pages/TeacherPage';
 import UploadStudents from './pages/UploadStudents';
 import MonitorStudents from './pages/MonitorStudents';
 import TeacherPendingPage from './pages/TeacherPendingPage';
+import TeacherTLM from './pages/TeacherTLM';
 import AdminPage from './pages/AdminPage';
 import ManageStoryMode from './pages/ManageStoryMode';
 import ManageThematicLearningMode from './pages/ManageThematicLearningMode';
@@ -70,6 +71,18 @@ const App = () => {
           <ProtectedRoute allowedRoles={['teacher']}>
             <MainLayout>
               <Dashboard />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected Teacher TLM Manager */}
+      <Route
+        path="/TeacherPage/manage-thematic-learning-mode"
+        element={
+          <ProtectedRoute allowedRoles={['teacher']}>
+            <MainLayout>
+              <TeacherTLM />
             </MainLayout>
           </ProtectedRoute>
         }

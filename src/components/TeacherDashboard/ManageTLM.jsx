@@ -3,59 +3,96 @@ import { db, auth } from '../../firebase';
 import {
   collection,
   getDocs,
+  query,
+  where,
   addDoc,
-  updateDoc,
+  serverTimestamp,
+  doc,
+  updateDoc,   // ← make sure this is included
   deleteDoc,
-  doc
+  arrayUnion,
+  writeBatch,    // ← and this
 } from 'firebase/firestore';
-import { Puzzle, Plus, Edit2, Trash2, Save, X, Search, Filter, ChevronDown, ChevronUp, Upload, Wand2, Sparkles } from 'lucide-react';
+import { Puzzle, Plus, Edit2, Trash2, Save, X, Search, Filter, ChevronDown, ChevronUp, Upload, Wand2, Sparkles, Send } from 'lucide-react';
 
-export default function ThematicLearningMode() {
+export default function ManageTLM() {
   const [themes, setThemes] = useState([]);
   const [loadingThemes, setLoadingThemes] = useState(true);
-  // Firestore CRUD functions
-  const fetchThemes = async () => {
+  
+//   // Firestore CRUD functions
+//   const fetchThemes = async () => {
+//     setLoadingThemes(true);
+//     try {
+//       const querySnapshot = await getDocs(collection(db, 'themes'));
+//       const themeList = querySnapshot.docs.map(docSnap => ({
+//         id: docSnap.id,
+//         ...docSnap.data()
+//       }));
+//       setThemes(themeList);
+//     } catch {
+//       alert('Failed to fetch themes from database.');
+//     } finally {
+//       setLoadingThemes(false);
+//     }
+//   };
+
+useEffect(() => {
+  const loadTeacherData = async () => {
+    const teacherId = auth.currentUser?.uid;
+    if (!teacherId) return;
+
     setLoadingThemes(true);
     try {
-      const querySnapshot = await getDocs(collection(db, 'themes'));
-      const themeList = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...docSnap.data()
-      }));
+      // Fetch ONLY themes created by this teacher
+      const themesQuery = query(collection(db, 'themes'), where('createdBy', '==', teacherId));
+      const themesSnap = await getDocs(themesQuery);
+      const themeList = themesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Fetch students assigned to this teacher
+      const studentsQuery = query(collection(db, 'students'), where('teacherId', '==', teacherId));
+      const studentsSnap = await getDocs(studentsQuery);
+      const studentList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
       setThemes(themeList);
+      setStudents(studentList);
     } catch {
-      alert('Failed to fetch themes from database.');
+      alert('Failed to load your data.');
     } finally {
       setLoadingThemes(false);
     }
   };
 
-  useEffect(() => {
-    fetchThemes();
-  }, []);
+  loadTeacherData();
+}, []);
 
-  const createTheme = async (theme) => {
-    try {
-      const newTheme = {
-        ...theme,
-        createdBy: auth.currentUser.uid,   // 👈 adds the admin's UID
-        creatorRole: 'admin'               // 👈 marks it as created by admin
-      };
-      const docRef = await addDoc(collection(db, 'themes'), newTheme);
-      setThemes(prev => [...prev, { ...newTheme, id: docRef.id }]);
-    } catch {
-      alert('Failed to create theme.');
-    }
-  };
+const createTheme = async (theme) => {
+  try {
+    const newTheme = {
+      ...theme,
+      createdBy: auth.currentUser.uid,
+      creatorRole: 'teacher' // ← important!
+    };
+    const docRef = await addDoc(collection(db, 'themes'), newTheme);
+    setThemes(prev => [...prev, { ...newTheme, id: docRef.id }]);
+  } catch {
+    alert('Failed to create theme.');
+  }
+};
 
-  const updateTheme = async (id, theme) => {
-    try {
-      await updateDoc(doc(db, 'themes', id), theme);
-      setThemes(prev => prev.map(t => t.id === id ? { ...theme, id } : t));
-    } catch {
-      alert('Failed to update theme.');
-    }
-  };
+const updateTheme = async (id, theme) => {
+  try {
+    const existing = themes.find(t => t.id === id);
+    const updated = {
+      ...theme,
+      createdBy: existing?.createdBy || auth.currentUser.uid,
+      creatorRole: existing?.creatorRole || 'teacher'
+    };
+    await updateDoc(doc(db, 'themes', id), updated);
+    setThemes(prev => prev.map(t => t.id === id ? { ...updated, id } : t));
+  } catch {
+    alert('Failed to update theme.');
+  }
+};
 
   const deleteTheme = async (id) => {
     try {
@@ -72,9 +109,16 @@ export default function ThematicLearningMode() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('All');
   const [bulkInput, setBulkInput] = useState('');
-  //const [showAIGenerator, setShowAIGenerator] = useState(false);
-  //const [aiLoading, setAiLoading] = useState(false);
-  //const [aiError, setAiError] = useState('');
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState(new Set()); // Set for fast lookup
+  const [searchStudent, setSearchStudent] = useState('');
+  const [students, setStudents] = useState([]); // to store teacher's students
+  const [alreadyAssigned, setAlreadyAssigned] = useState(new Set());
+  const [setFilteredStudentsCount] = useState(0);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -88,8 +132,8 @@ export default function ThematicLearningMode() {
   const [wordInput, setWordInput] = useState({ word: '', definition: '', image: '' });
 
   // AI Generation state
-  //const [aiCount, setAiCount] = useState(15);
-  //const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+  const [aiCount, setAiCount] = useState(15);
+  const [aiCustomPrompt, setAiCustomPrompt] = useState('');
 
   const gradientOptions = [
     { value: 'from-blue-500 to-indigo-500', label: 'Blue', preview: 'bg-gradient-to-r from-blue-500 to-indigo-500' },
@@ -101,6 +145,106 @@ export default function ThematicLearningMode() {
   ];
 
   const difficultyOptions = ['Easy', 'Medium', 'Hard'];
+
+const handleAssignClick = async (theme) => {
+  // Get current assignments for this theme
+  const assignmentsRef = collection(db, 'assignments');
+  const q = query(
+    assignmentsRef,
+    where('themeId', '==', theme.id),
+    where('teacherId', '==', auth.currentUser.uid)
+  );
+  const snapshot = await getDocs(q);
+  
+  const alreadyAssignedStudentIds = new Set();
+  snapshot.docs.forEach(doc => {
+    const data = doc.data();
+    data.studentIds.forEach(id => alreadyAssignedStudentIds.add(id));
+  });
+
+  setSelectedTheme(theme);
+  setAlreadyAssigned(alreadyAssignedStudentIds); // new state
+  setSelectedStudentIds(new Set());
+  setSearchStudent('');
+  setIsAssignModalOpen(true);
+};
+
+const handleAssignSubmit = async () => {
+  if (selectedStudentIds.size === 0) {
+    alert('Please select at least one student.');
+    return;
+  }
+
+  const batch = writeBatch(db);
+  const studentIdArray = Array.from(selectedStudentIds);
+
+  // 1. Create assignment record (for teacher tracking)
+  batch.set(doc(collection(db, 'assignments')), {
+    themeId: selectedTheme.id,
+    teacherId: auth.currentUser.uid,
+    studentIds: studentIdArray,
+    assignedAt: serverTimestamp(),
+    status: 'assigned'
+  });
+
+  // 2. Add themeId to each student's assignedThemeIds
+  studentIdArray.forEach(studentId => {
+    batch.update(doc(db, 'students', studentId), {
+      assignedThemeIds: arrayUnion(selectedTheme.id)
+    });
+  });
+
+  try {
+    await batch.commit();
+    alert('Quiz assigned successfully!');
+    setIsAssignModalOpen(false);
+    setSelectedStudentIds(new Set()); // reset selection
+  } catch (err) {
+    console.error('Assignment error:', err);
+    alert('Failed to assign quiz.');
+  }
+};
+
+    // Toggle a single student
+const toggleStudent = (studentId) => {
+  const newSet = new Set(selectedStudentIds);
+  if (newSet.has(studentId)) {
+    newSet.delete(studentId);
+  } else {
+    newSet.add(studentId);
+  }
+  setSelectedStudentIds(newSet);
+};
+
+// Toggle "Select All" (only for filtered students)
+const toggleSelectAll = () => {
+  const filteredStudents = students.filter(s => 
+    !alreadyAssigned.has(s.id) && 
+    (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+  );
+  
+  setFilteredStudentsCount(filteredStudents.length);
+  const allSelected = filteredStudents.every(s => selectedStudentIds.has(s.id));
+  const newSet = new Set(selectedStudentIds);
+
+  if (allSelected) {
+    filteredStudents.forEach(s => newSet.delete(s.id));
+  } else {
+    filteredStudents.forEach(s => newSet.add(s.id));
+  }
+  
+  setSelectedStudentIds(newSet);
+};
+
+
+  // Check if "Select All" should be checked
+  const isAllFilteredSelected = () => {
+  const filteredStudents = students.filter(s => 
+    !alreadyAssigned.has(s.id) && 
+    (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+    );
+    return filteredStudents.length > 0 && filteredStudents.every(s => selectedStudentIds.has(s.id));
+    };
 
   const handleOpenModal = (theme = null) => {
     if (theme) {
@@ -125,8 +269,8 @@ export default function ThematicLearningMode() {
       });
     }
     setBulkInput('');
-    //setShowAIGenerator(false);
-    //setAiError('');
+    setShowAIGenerator(false);
+    setAiError('');
     setIsModalOpen(true);
   };
 
@@ -135,8 +279,8 @@ export default function ThematicLearningMode() {
     setEditingTheme(null);
     setWordInput({ word: '', definition: '' });
     setBulkInput('');
-    //setShowAIGenerator(false);
-    //setAiError('');
+    setShowAIGenerator(false);
+    setAiError('');
   };
 
   const handleAddWord = () => {
@@ -244,84 +388,79 @@ export default function ThematicLearningMode() {
     e.target.value = '';
   };
 
-  // const generateWithAI = async (customPrompt = '') => {
-  //   setAiLoading(true);
-  //   setAiError('');
-    
-  //   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  //   const BASE_URL = "https://googleapis.com/v1/models/gemini-2.5-flash";
+  const generateWithAI = async (customPrompt = '') => {
+  setAiLoading(true);
+  setAiError('');
 
-  //   const themeContext = formData.title || formData.description || 'general vocabulary';
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!API_KEY) {
+    setAiError('Missing Gemini API key. Check your .env file.');
+    setAiLoading(false);
+    return;
+  }
 
-  //   const prompt = customPrompt || 
-  //     `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${themeContext}". For each word, provide a very simple definition that a 6-year-old can understand. Format as: word, definition (one per line). Only return the word list, no additional text.`;
-    
-  //   try {
-  //     const response = await fetch(`${BASE_URL}/chat/completions`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': `Bearer ${API_KEY}`,
-  //         'HTTP-Referer': window.location.origin,
-  //         'X-Title': 'Theme Management App',
-  //       },
-  //       body: JSON.stringify({
-  //         model: "gemini-2.5-flash",
-  //         messages: [
-  //           {
-  //             role: "user",
-  //             content: prompt
-  //           }
-  //         ]
-  //       })
-  //     });
+  const prompt = customPrompt || 
+    `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${formData.title || 'general vocabulary'}". For each word, provide a very simple definition that a 6-year-old can understand. Format as: word, definition (one per line). Only return the word list, no additional text.`;
 
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      }
+    );
 
-  //     const data = await response.json();
-  //     const text = data.choices[0].message.content;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`HTTP ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+    }
 
-  //     const newWords = parseAIResponse(text);
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+    const newWords = parseAIResponse(text);
 
-  //     if (newWords.length > 0) {
-  //       setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
-  //       setShowAIGenerator(false);
-  //       alert(`Successfully generated ${newWords.length} words with AI!`);
-  //     } else {
-  //       throw new Error('Could not parse AI response into word list');
-  //     }
-  //   } catch (err) {
-  //     setAiError(`Error: ${err.message}`);
-  //   } finally {
-  //     setAiLoading(false);
-  //   }
-  // };
+    if (newWords.length > 0) {
+      setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
+      setShowAIGenerator(false);
+      alert(`Successfully generated ${newWords.length} words with AI!`);
+    } else {
+      throw new Error('No valid words found in AI response.');
+    }
+  } catch (err) {
+    console.error('Gemini AI Error:', err);
+    setAiError(`AI Error: ${err.message}`);
+  } finally {
+    setAiLoading(false);
+  }
+};
 
-  // const parseAIResponse = (text) => {
-  //   const lines = text.trim().split('\n');
-  //   return lines
-  //     .map(line => {
-  //       const match = line.match(/^[0-9.)\s-]*(.+?)[,:-]\s*(.+)$/);
-  //       if (match) {
-  //         return {
-  //           word: match[1].trim(),
-  //           definition: match[2].trim()
-  //         };
-  //       }
+  const parseAIResponse = (text) => {
+    const lines = text.trim().split('\n');
+    return lines
+      .map(line => {
+        const match = line.match(/^[0-9.)\s-]*(.+?)[,:-]\s*(.+)$/);
+        if (match) {
+          return {
+            word: match[1].trim(),
+            definition: match[2].trim()
+          };
+        }
 
-  //       const parts = line.split(/[,|\t]/).map(p => p.trim());
-  //       if (parts.length >= 2) {
-  //         return {
-  //           word: parts[0].replace(/^[0-9.)\s-]+/, '').trim(),
-  //           definition: parts[1].trim()
-  //         };
-  //       }
-  //       return null;
-  //     })
-  //     .filter(item => item && item.word && item.definition);
-  // };
+        const parts = line.split(/[,|\t]/).map(p => p.trim());
+        if (parts.length >= 2) {
+          return {
+            word: parts[0].replace(/^[0-9.)\s-]+/, '').trim(),
+            definition: parts[1].trim()
+          };
+        }
+        return null;
+      })
+      .filter(item => item && item.word && item.definition);
+  };
 
 
   const handleSaveTheme = async () => {
@@ -427,6 +566,14 @@ export default function ThematicLearningMode() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                      onClick={() => handleAssignClick(theme)}
+                      className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-all"
+                      title="Assign as Quiz"
+                      >
+                      <Send className="w-5 h-5 text-white" />
+                      </button>
+
                       <button
                         onClick={() => handleOpenModal(theme)}
                         className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-all"
@@ -592,18 +739,18 @@ export default function ThematicLearningMode() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-900">Words ({formData.words.length})</h3>
                   <div className="flex gap-2">
-                    {/* <button
+                    <button
                       onClick={() => setShowAIGenerator(!showAIGenerator)}
                       className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all text-sm"
                     >
                       <Wand2 className="w-4 h-4" />
                       AI Generate
-                    </button> */}
+                    </button>
                   </div>
                 </div>
 
-                AI Generator Section
-                {/* {showAIGenerator && (
+                {/* AI Generator Section */}
+                {showAIGenerator && (
                   <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg space-y-3">
                     <div className="flex items-center gap-2 text-purple-900 mb-2">
                       <Sparkles className="w-5 h-5" />
@@ -644,7 +791,7 @@ export default function ThematicLearningMode() {
                         onChange={(e) => setAiCustomPrompt(e.target.value)}
                         placeholder="e.g., Generate science vocabulary for beginners with simple definitions"
                         rows="2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none text-sm"
+                        className="w-full px-3 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none text-sm"
                       />
                     </div>
 
@@ -672,7 +819,7 @@ export default function ThematicLearningMode() {
                       )}
                     </button>
                   </div>
-                )} */}
+                )}
                 
                 {/* Bulk Import Section */}
                 <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
@@ -803,6 +950,145 @@ export default function ThematicLearningMode() {
           </div>
         </div>
       )}
+
+      {/* Beautiful Assignment Modal */}
+{isAssignModalOpen && selectedTheme && (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+      {/* Header */}
+      <div 
+        className={`sticky top-0 bg-gradient-to-r ${selectedTheme.gradient} text-white p-6 rounded-t-2xl`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Assign Quiz</h2>
+            <p className="text-purple-100">{`"${selectedTheme.title}"`}</p>
+          </div>
+          <button
+            onClick={() => setIsAssignModalOpen(false)}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-hidden p-6">
+        {/* Search Bar */}
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search students by name or email..."
+            value={searchStudent}
+            onChange={(e) => setSearchStudent(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm"
+          />
+        </div>
+
+        {/* Select All */}
+        <div className="mb-4 flex items-center">
+        <input
+            type="checkbox"
+            checked={isAllFilteredSelected()}
+            onChange={toggleSelectAll}
+            className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+            id="select-all"
+        />
+        <label htmlFor="select-all" className="ml-2 font-medium text-gray-700">
+             Select all {searchStudent ? 'filtered' : ''} students (
+            {students.filter(s => 
+                !alreadyAssigned.has(s.id) && 
+                (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+            ).length}
+            )
+        </label>
+        </div>
+
+        {/* Student List */}
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-2 pb-14">
+        {(() => {
+            const filteredStudents = students.filter(s => 
+            !alreadyAssigned.has(s.id) && 
+            (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+            );
+
+            return (
+            <div>
+                {/* Show count of visible/assignable students */}
+                <div className="text-sm text-gray-600 mb-2">
+                Showing {filteredStudents.length} of {students.length} students
+                </div>
+
+                {filteredStudents.length > 0 ? (
+                filteredStudents.map(student => (
+                    <div
+                    key={student.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200"
+                    >
+                    <div>
+                        <div className="font-semibold text-gray-900">
+                        {student.name || 'Unnamed Student'}
+                        </div>
+                        <div className="text-sm text-gray-500">{student.email}</div>
+                    </div>
+                    <input
+                        type="checkbox"
+                        checked={selectedStudentIds.has(student.id)}
+                        onChange={() => toggleStudent(student.id)}
+                        className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                    />
+                    </div>
+                ))
+                ) : (
+                <p className="text-center text-gray-500 py-4">
+                    {searchStudent 
+                    ? 'No students match your search.' 
+                    : 'All students are already assigned to this quiz.'}
+                </p>
+                )}
+            </div>
+            );
+        })()}
+        </div>
+
+        {students.length === 0 && (
+          <p className="text-center text-gray-500 py-4">No students found.</p>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            {selectedStudentIds.size} of {
+                students.filter(s => 
+                !alreadyAssigned.has(s.id) && 
+                (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+                ).length
+            } students selected
+            </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsAssignModalOpen(false)}
+              className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+                onClick={handleAssignSubmit} // ✅ clean and simple
+                disabled={selectedStudentIds.size === 0}
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                Assign Quiz ({selectedStudentIds.size})
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

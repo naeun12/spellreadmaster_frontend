@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { db } from '../../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { db, auth } from '../../firebase';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Volume2, HelpCircle, CheckCircle, XCircle, Trophy, Star, RotateCcw, Home, Sparkles } from 'lucide-react';
 
 export default function StudentTLM() {
@@ -9,24 +9,58 @@ export default function StudentTLM() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchThemes = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const querySnapshot = await getDocs(collection(db, 'themes'));
-        const themeList = querySnapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }));
-        setThemes(themeList);
-      } catch {
-        setError('Failed to load themes from database.');
-      } finally {
-        setLoading(false);
+  const fetchThemesForStudent = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const studentId = auth.currentUser.uid;
+      
+      // 1. Get student's assigned theme IDs (from teacher assignments)
+      const studentDoc = await getDoc(doc(db, 'students', studentId));
+      const assignedThemeIds = studentDoc.exists() 
+        ? studentDoc.data().assignedThemeIds || [] 
+        : [];
+
+      // 2. Fetch assigned themes
+      const assignedThemes = [];
+      for (const themeId of assignedThemeIds) {
+        const themeDoc = await getDoc(doc(db, 'themes', themeId));
+        if (themeDoc.exists()) {
+          assignedThemes.push({ id: themeDoc.id, ...themeDoc.data() });
+        }
       }
-    };
-    fetchThemes();
-  }, []);
+
+      // 3. Fetch ALL admin-created themes (available to everyone)
+      const adminThemesQuery = query(
+        collection(db, 'themes'),
+        where('creatorRole', '==', 'admin')
+      );
+      const adminSnapshot = await getDocs(adminThemesQuery);
+      const adminThemes = adminSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // 4. Combine: admin themes + assigned teacher themes
+      const allThemes = [...adminThemes, ...assignedThemes];
+      
+      // Optional: remove duplicates (if an admin theme was also assigned)
+      const uniqueThemes = Array.from(
+        new Map(allThemes.map(item => [item.id, item])).values()
+      );
+
+      setThemes(uniqueThemes);
+    } catch (err) {
+      console.error('Error loading themes:', err);
+      setError('Failed to load themes.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchThemesForStudent();
+}, []);
 
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [gameState, setGameState] = useState('theme-select');
@@ -50,6 +84,31 @@ export default function StudentTLM() {
     window.speechSynthesis.speak(utterance);
   }
 }, []);
+
+  const saveTLMScore = async (theme, allAnswers) => {
+    const finalScore = allAnswers.filter(a => a.correct).length;
+    const studentId = auth.currentUser.uid;
+
+    try {
+      await addDoc(collection(db, 'students', studentId, 'activity'), {
+        mode: 'TLM',
+        themeId: theme.id,
+        themeTitle: theme.title,
+        score: finalScore, // ✅ use finalScore, not stale `score`
+        maxScore: theme.words.length,
+        percentage: Math.round((finalScore / theme.words.length) * 100),
+        timestamp: serverTimestamp(),
+        completed: true,
+        answers: allAnswers.map(a => ({ // ✅ use allAnswers, not stale `answers`
+          word: a.question.word,
+          userAnswer: a.userAnswer,
+          correct: a.correct
+        }))
+      });
+    } catch (error) {
+      console.error('Failed to save TLM score:', error);
+    }
+  };
 
   const startGame = (theme) => {
     setSelectedTheme(theme);
@@ -176,6 +235,7 @@ export default function StudentTLM() {
           setupQuestion(selectedTheme.words[currentQuestionIndex + 1]); // ✅ now safe
         } else {
           setGameState('results');
+          saveTLMScore(selectedTheme, [...answers, { question: currentQuestion, userAnswer, correct }]); // ✅ Save the score here
         }
       }, 2500);
     }, 300);
@@ -188,7 +248,8 @@ export default function StudentTLM() {
   currentQuestionIndex,
   selectedTheme,
   setupQuestion, // ✅ now included
-  speakWord // optional but good practice
+  speakWord,
+  answers // optional but good practice
 ]);
 
   // Theme Selection Screen
