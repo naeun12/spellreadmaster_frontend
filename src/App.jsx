@@ -29,6 +29,7 @@ import StudentLBLM from './components/StudentDashboard/StudentLBLM';
 // Layouts
 import HomeLayout from './components/Layout/HomeLayout';
 import MainLayout from './components/Layout/MainLayout';
+import GameLayout from './components/Layout/GameLayout';
 
 const App = () => {
   return (
@@ -261,9 +262,9 @@ const App = () => {
         path="/StudentPage/level-based-learning-mode"
         element={
           <ProtectedRoute allowedRoles={['student']}>
-            <MainLayout>
+            <GameLayout>
               <StudentLBLM />
-            </MainLayout>
+            </GameLayout>
           </ProtectedRoute>
         }
       /> 

@@ -1,16 +1,93 @@
-import React, { useState, useEffect } from 'react';
-import { Lock, Star, CheckCircle, Trophy, Zap, Target, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Lock, CheckCircle, Zap } from 'lucide-react';
+
+// Add custom animations
+const styles = `
+  @keyframes shoot {
+    0% { 
+      transform: translateX(-100px) translateY(0); 
+      opacity: 1; 
+    }
+    100% { 
+      transform: translateX(100vw) translateY(50vh); 
+      opacity: 0; 
+    }
+  }
+
+  @keyframes spaceshipFly {
+  0% {
+    transform: translateX(-100px) translateY(0);
+  }
+  25% {
+    transform: translateX(25vw) translateY(120px);
+  }
+  50% {
+    transform: translateX(50vw) translateY(0px);
+  }
+  75% {
+    transform: translateX(75vw) translateY(-80px);
+  }
+  100% {
+    transform: translateX(100vw) translateY(0px);
+  }
+}
+
+.animate-spaceship-fly {
+  animation: spaceshipFly 12s linear infinite;
+}
+  
+  @keyframes orbit {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(5deg); }
+  }
+  
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-15deg); }
+  }
+  
+  @keyframes speedEffect {
+    0% { 
+      transform: scaleX(1) translateX(0);
+      opacity: 0.3;
+    }
+    50% { 
+      transform: scaleX(2) translateX(-50px);
+      opacity: 0.6;
+    }
+    100% { 
+      transform: scaleX(1) translateX(0);
+      opacity: 0.3;
+    }
+  }
+  
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
 
 export default function StudentLBLM() {
+  const containerRef = useRef(null);
+  //const [isAnimating, setIsAnimating] = useState(false);
+  
   // Student progress state
   const [studentData, setStudentData] = useState({
-    totalExp: 150, // From pre-test
+    totalExp: 150,
     currentLevel: 1,
     completedLevels: [],
     currentLevelProgress: 0,
-    skillLevel: 'beginner', // From pre-test: beginner, intermediate, advanced
-    weakAreas: ['vowels', 'consonant blends'] // From pre-test
+    skillLevel: 'beginner',
+    weakAreas: ['vowels', 'consonant blends']
   });
+
+  const verticalOffset = -100;
 
   // Level configuration
   const levelConfig = [
@@ -25,24 +102,23 @@ export default function StudentLBLM() {
 
   const [levels, setLevels] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const frameHeight = window.innerHeight;
-  const levelSpacing = 200;
+  const levelSpacing = 250;
 
   const generateLevels = () => {
     const newLevels = [];
-    const padding = 180; // Increased to account for header
-    const screenWidth = window.innerWidth - padding * 2;
-    const centerX = screenWidth / 2 + padding; // Center of the visible area
+    const screenHeight = window.innerHeight - 200;
+    const centerY = screenHeight / 2;
     
     for (let i = 0; i < levelConfig.length; i++) {
-      const y = padding + (i * levelSpacing);
-      const xVariation = screenWidth * 0.4; // Zigzag width
-      const zigzagOffset = (Math.random() - 0.5) * xVariation;
-      const x = centerX + zigzagOffset;
+      const x = i * levelSpacing;
+      const yVariation = screenHeight * 0.3;
+      const zigzagOffset = Math.sin(i * 0.8) * yVariation;
+      const y = centerY + zigzagOffset + verticalOffset;
       
       newLevels.push({
         x,
         y,
+        visualOffset: { x: 0, y: 0 }, // Adjust these values as needed
         ...levelConfig[i]
       });
     }
@@ -50,13 +126,31 @@ export default function StudentLBLM() {
     setLevels(newLevels);
   };
 
-  // Generate level positions on mount
   useEffect(() => {
     generateLevels();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Center on first level initially
+    setTimeout(() => {
+      centerOnLevel(levelConfig[0]);
+    }, 100);
   }, []);
 
-  // Calculate level state
+  const centerOnLevel = (level) => {
+    if (!containerRef.current) return;
+    
+    const levelIndex = level.level - 1;
+    const targetX = levelIndex * levelSpacing;
+    const containerWidth = window.innerWidth;
+    const scrollX = targetX - containerWidth / 2 + 100;
+    
+    //setIsAnimating(true);
+    containerRef.current.scrollTo({
+      left: scrollX,
+      behavior: 'smooth'
+    });
+    
+   // setTimeout(() => setIsAnimating(false), 800);
+  };
+
   const getLevelState = (level) => {
     if (studentData.completedLevels.includes(level.level)) {
       return 'completed';
@@ -67,43 +161,20 @@ export default function StudentLBLM() {
     return 'locked';
   };
 
-  const drawPath = (start, end) => {
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-    const offsetX = (end.y - start.y) * 0.15;
-    const offsetY = -(end.x - start.x) * 0.15;
-    
-    return `M ${start.x} ${start.y} Q ${midX + offsetX} ${midY + offsetY} ${end.x} ${end.y}`;
-  };
-
-  // Handle level click
   const handleLevelClick = (level) => {
     const state = getLevelState(level);
     if (state === 'locked') {
-      // Show "not enough exp" message
       return;
     }
+    // Don't call centerOnLevel() - just set the selected level immediately
     setSelectedLevel(level);
   };
 
-  // Start quiz (would connect to AI generation)
   const startQuiz = async (level) => {
     console.log('Starting quiz for level:', level.level);
-    console.log('Student weak areas:', studentData.weakAreas);
-    console.log('Skill level:', studentData.skillLevel);
-    
-    // TODO: Call AI API here to generate personalized quiz
-    // const quiz = await generateQuiz({
-    //   theme: level.theme,
-    //   skillLevel: studentData.skillLevel,
-    //   weakAreas: studentData.weakAreas,
-    //   previousPerformance: studentData.completedLevels
-    // });
-    
     alert(`Starting ${level.theme} quiz! (Connect to AI API here)`);
   };
 
-  // Simulate completing a level (for demo)
   const completeLevel = (level) => {
     setStudentData(prev => ({
       ...prev,
@@ -113,165 +184,436 @@ export default function StudentLBLM() {
     setSelectedLevel(null);
   };
 
-  const contentHeight = Math.max((levelConfig.length - 1) * levelSpacing + 200, frameHeight);
+  const contentWidth = (levelConfig.length - 1) * levelSpacing + 800;
   const nextLevelExp = levelConfig.find(l => l.expRequired > studentData.totalExp)?.expRequired || levelConfig[levelConfig.length - 1].expRequired;
-  const progressPercent = ((studentData.totalExp - levelConfig[studentData.completedLevels.length]?.expRequired || 0) / 
+  const progressPercent = ((studentData.totalExp - (levelConfig[studentData.completedLevels.length]?.expRequired || 0)) / 
     ((nextLevelExp - (levelConfig[studentData.completedLevels.length]?.expRequired || 0)) || 1)) * 100;
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] p-16 rounded-3xl overflow-hidden mt-20 shadow-sm">
+    <div className="h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 overflow-hidden relative">
+      <style>{`
+        ${styles}
+        .animate-spin-slow {
+          animation: spin-slow 16s linear infinite;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+      
+      {/* Back to Dashboard Button */}
+      <div className={`absolute top-4 left-4 ${selectedLevel ? 'backdrop-blur-md' : ''} z-40`}>
+        <button
+          onClick={() => window.location.href = '/StudentPage'}
+          className={`bg-yellow-400 ${selectedLevel ? 'bg-opacity-10 hover:bg-opacity-15' : 'bg-opacity-20 hover:bg-opacity-30'} text-white rounded-full p-3 transition-colors shadow-lg`}
+          title="Back to Dashboard"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Twinkling stars background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(150)].map((_, i) => (
+          <div
+            key={`star-${i}`}
+            className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 3}s`,
+              opacity: 0.3 + Math.random() * 0.7
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Speed effect lines when animating 
+      {isAnimating && (
+        <div className="absolute inset-0 pointer-events-none z-50">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={`speed-${i}`}
+              className="absolute h-1 bg-white rounded-full"
+              style={{
+                top: `${Math.random() * 100}%`,
+                left: '50%',
+                width: '100px',
+                animation: 'speedEffect 0.5s ease-out infinite',
+                animationDelay: `${i * 0.05}s`,
+                opacity: 0.3
+              }}
+            />
+          ))}
+        </div>
+      )}*/}
+
+      {/* Shooting star - FIXED: No layout shift */}
+      <div className="absolute top-20 left-0 w-full h-1 pointer-events-none z-10 overflow-hidden">
+        <div 
+          className="absolute w-2 h-2 bg-white rounded-full blur-sm shadow-lg shadow-white/50 animate-[shoot_4s_ease-in-out_infinite]"
+          style={{
+            left: '-100px',
+            top: '0',
+            willChange: 'transform'
+          }}
+        />
+      </div>
+
+      {/* UFO with alien */}
+      <div className="absolute animate-[float_6s_ease-in-out_infinite] z-0"
+           style={{ 
+             right: '10%',
+             top: '20%',
+           }}>
+        <div className="relative">
+          <div className="absolute top-12 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[30px] border-r-[30px] border-t-[60px] border-l-transparent border-r-transparent border-t-yellow-400/20 blur-sm" />
+          
+          <div className="relative">
+            <div className="w-16 h-6 bg-gradient-to-b from-gray-300 to-gray-500 rounded-full shadow-xl" />
+            <div className="absolute top-1 left-1/2 -translate-x-1/2 -translate-y-3 w-8 h-6 bg-gradient-to-b from-cyan-400 to-cyan-600 rounded-t-full" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 text-xl animate-[wave_0.5s_ease-in-out_infinite]">
+              👽
+            </div>
+            <div className="absolute bottom-0 left-1/4 w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+            <div className="absolute bottom-0 right-1/4 w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Planet - Clean version with gentle float and glimmer */}
+      <div className="absolute animate-[float_8s_ease-in-out_infinite] z-0"
+           style={{ 
+             left: '8%',
+             bottom: '15%',
+           }}>
+        <div className="w-28 h-28 bg-gradient-to-br from-purple-400 via-pink-400 to-purple-600 rounded-full shadow-2xl shadow-purple-500/50 relative overflow-hidden">
+          {/* Glimmer effects */}
+          <div className="absolute top-2 left-2 w-6 h-3 bg-white/30 rounded-full transform rotate-45 animate-pulse" 
+               style={{ animationDelay: '0s' }}></div>
+          <div className="absolute top-6 right-4 w-4 h-2 bg-yellow-200/40 rounded-full animate-pulse" 
+               style={{ animationDelay: '1s' }}></div>
+          <div className="absolute bottom-8 right-6 w-5 h-2 bg-blue-200/30 rounded-full animate-pulse" 
+               style={{ animationDelay: '2s' }}></div>
+          <div className="absolute bottom-4 left-4 w-7 h-3 bg-pink-200/35 rounded-full animate-pulse" 
+               style={{ animationDelay: '3s' }}></div>
+          
+          {/* Inner glow */}
+          <div className="absolute inset-0 w-full h-full rounded-full bg-gradient-to-br from-transparent via-white/10 to-transparent" />
+        </div>
+      </div>
+
+      {/* Moon - Subtle micro-orbit in lower right, anchored to avoid header interference */}
+      <div className="absolute z-0"
+          style={{ 
+            right: '12%',
+            bottom: '12%', // Fixed position, stays safely below header
+          }}>
+        <div className="relative animate-[orbit_30s_linear_infinite]">
+          <div className="w-20 h-20 bg-gradient-to-br from-gray-300 via-gray-400 to-gray-600 rounded-full shadow-2xl shadow-gray-500/50 relative overflow-hidden">
+            {/* Craters */}
+            <div className="absolute top-3 left-3 w-3 h-3 bg-gray-600 rounded-full"></div>
+            <div className="absolute top-6 right-4 w-2 h-2 bg-gray-700 rounded-full"></div>
+            <div className="absolute bottom-6 right-6 w-4 h-4 bg-gray-500 rounded-full"></div>
+            <div className="absolute bottom-4 left-4 w-3 h-3 bg-gray-600 rounded-full"></div>
+            <div className="absolute top-8 left-6 w-2 h-2 bg-gray-700 rounded-full"></div>
+            
+            {/* Subtle glow for depth */}
+            <div className="absolute inset-0 w-full h-full rounded-full bg-gradient-to-br from-transparent via-white/5 to-transparent" />
+          </div>
+        </div>
+      </div>
+
+       {/* Spaceship - Continuous wave motion from left to right */}
+      <div 
+        className="absolute z-0 animate-spaceship-fly"
+        style={{ 
+          left: '-100px', // Start off-screen to the left
+          top: '45%',
+        }}
+      >
+        <div className="relative">
+          {/* Spaceship body */}
+          <div className="w-16 h-6 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full shadow-lg shadow-blue-400/50" />
+          
+          {/* Cockpit */}
+          <div className="absolute top-1 right-2 w-6 h-4 bg-gradient-to-r from-cyan-300 to-blue-400 rounded-full" />
+          
+          {/* Wings */}
+          <div className="absolute -bottom-1 left-2 w-4 h-2 bg-gradient-to-r from-purple-400 to-pink-500 rounded-t-full" />
+          <div className="absolute -bottom-1 right-2 w-4 h-2 bg-gradient-to-r from-purple-400 to-pink-500 rounded-t-full" />
+          
+          {/* Engine glow */}
+          <div className="absolute -left-2 top-1 w-3 h-4 bg-yellow-300 rounded-full blur-sm animate-pulse" />
+        </div>
+
+        {/* Faint trail behind spaceship — only visible during motion */}
+        <div className="absolute z-0 animate-trail opacity-30 pointer-events-none"
+            style={{
+              left: '-100px',
+              top: '15%',
+              width: '120px',
+              height: '2px',
+              background: 'linear-gradient(to right, transparent, rgba(236, 255, 255, 0.4), transparent)',
+              borderRadius: '50%',
+              transform: 'translateX(50px)',
+              animation: 'trailFade 12s linear infinite',
+            }}
+        />
+      </div>
+
       {/* Sticky header with EXP bar */}
-      <div className="sticky top-0 left-0 right-0 bg-white shadow-lg z-30 border-b-4 border-purple-200">
+      <div className="relative bg-indigo-900/90 backdrop-blur-md shadow-lg z-30 border-b-4 border-purple-500/50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
-                <BookOpen className="w-8 h-8 text-white" />
+              <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/50 animate-pulse">
+                <span className="text-3xl">⭐</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Spelling Adventure</h1>
-                <p className="text-sm text-gray-600">Level {studentData.completedLevels.length + 1}</p>
+                <h1 className="text-2xl font-bold text-white">Spelling Galaxy</h1>
+                <p className="text-sm text-purple-300">Level {studentData.completedLevels.length + 1}</p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <div className="flex items-center gap-2 text-2xl font-bold text-purple-600">
-                  <Zap className="w-6 h-6" />
+                <div className="flex items-center gap-2 text-2xl font-bold text-yellow-400">
+                  <Zap className="w-6 h-6 drop-shadow-lg" />
                   {studentData.totalExp} EXP
                 </div>
-                <p className="text-xs text-gray-500">{nextLevelExp - studentData.totalExp} to next level</p>
+                <p className="text-xs text-purple-300">{nextLevelExp - studentData.totalExp} to next level</p>
               </div>
             </div>
           </div>
           
-          {/* EXP Progress Bar */}
-          <div className="relative w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+          <div className="relative w-full h-4 bg-indigo-950/50 rounded-full overflow-hidden border border-purple-500/30">
             <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 transition-all duration-500 rounded-full"
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 transition-all duration-500 rounded-full shadow-lg shadow-yellow-500/50"
               style={{ width: `${Math.min(progressPercent, 100)}%` }}
             >
-              <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+              <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Scrollable level map */}
-      <div className="relative w-full" style={{ height: `${contentHeight}px` }}>
-        {/* Background decorations */}
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div className="absolute top-40 left-20 w-96 h-96 bg-purple-300 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-40 right-20 w-96 h-96 bg-pink-300 rounded-full blur-3xl"></div>
-        </div>
+      {/* Scrollable horizontal level map */}
+      <div 
+        ref={containerRef}
+        className="relative overflow-x-auto overflow-y-hidden scrollbar-hide"
+        style={{ 
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          marginLeft: '56px', /* Account for sidebar width when collapsed */
+          marginRight: '0',
+          height: 'calc(100vh - 120px)', /* Subtract header height */
+          marginTop: '0'
+        }}
+      >
+        <div className="relative h-full" style={{ width: `${contentWidth}px`, minHeight: 'calc(100vh - 120px)' }}>
+          {/* Background nebula clouds */}
+          <div className="absolute inset-0 opacity-30 pointer-events-none">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500 rounded-full blur-[120px]"></div>
+            <div className="absolute top-1/3 right-1/3 w-96 h-96 bg-blue-500 rounded-full blur-[120px]"></div>
+            <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-pink-500 rounded-full blur-[120px]"></div>
+          </div>
 
-        {/* SVG for paths */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ height: `${contentHeight}px` }}>
-          <defs>
-            <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#A78BFA" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#EC4899" stopOpacity="0.4" />
-            </linearGradient>
-          </defs>
+          {/* SVG for paths - FIXED: Uses same coordinate system as stars */}
+          <svg 
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            style={{
+              //marginLeft: '56px', // Same as your map container
+              marginRight: '0',
+              height: 'calc(100vh - 120px)',
+              marginTop: '0'
+            }}
+          >
+            <defs>
+              <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#FCD34D" stopOpacity="0.6" />
+                <stop offset="50%" stopColor="#F59E0B" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="#FCD34D" stopOpacity="0.6" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            {levels.map((level, index) => {
+              if (index < levels.length - 1) {
+                const currentState = getLevelState(level);
+                const isUnlocked = currentState === 'completed' || currentState === 'unlocked';
+                
+                // FIXED: Use same coordinate system as stars (add 400, 100 offsets)
+                const startLevel = {
+                  x: level.x + 400 + level.visualOffset.x,
+                  y: level.y + 100 + level.visualOffset.y
+                };
+                const endLevel = {
+                  x: levels[index + 1].x + 400 + levels[index + 1].visualOffset.x,
+                  y: levels[index + 1].y + 100 + levels[index + 1].visualOffset.y
+                };
+
+                // Calculate path with corrected coordinates
+                const midX = (startLevel.x + endLevel.x) / 2;
+                const midY = (startLevel.y + endLevel.y) / 2;
+                const controlY = midY - 30; // Fixed curve height
+                
+                return (
+                  <path
+                    key={`path-${index}`}
+                    d={`M ${startLevel.x} ${startLevel.y} Q ${midX} ${controlY} ${endLevel.x} ${endLevel.y}`}
+                    stroke={isUnlocked ? "url(#pathGradient)" : "#1E3A8A"}
+                    strokeWidth="4"
+                    fill="none"
+                    strokeDasharray={isUnlocked ? "none" : "8 8"}
+                    strokeLinecap="round"
+                    filter={isUnlocked ? "url(#glow)" : "none"}
+                  />
+                );
+              }
+              return null;
+            })}
+          </svg>
+
+          {/* Level nodes */}
           {levels.map((level, index) => {
-            if (index < levels.length - 1) {
-              const currentState = getLevelState(level);
-              const isUnlocked = currentState === 'completed' || currentState === 'unlocked';
-              
-              return (
-                <path
-                  key={`path-${index}`}
-                  d={drawPath(level, levels[index + 1])}
-                  stroke={isUnlocked ? "url(#pathGradient)" : "#E5E7EB"}
-                  strokeWidth="6"
-                  fill="none"
-                  strokeDasharray={isUnlocked ? "none" : "12 12"}
-                  strokeLinecap="round"
-                />
-              );
-            }
-            return null;
-          })}
-        </svg>
+            const state = getLevelState(level);
+            const isLocked = state === 'locked';
+            const isCompleted = state === 'completed';
+            const isUnlocked = state === 'unlocked';
 
-        {/* Level nodes */}
-        {levels.map((level, index) => {
-          const state = getLevelState(level);
-          const isLocked = state === 'locked';
-          const isCompleted = state === 'completed';
-          const isUnlocked = state === 'unlocked';
+            return (
+              <div
+                key={`level-${index}`}
+                className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${
+                  isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:scale-125'
+                }`}
+                style={{ 
+                  left: `${level.x + 400}px`, 
+                  top: `${level.y + 100}px` 
+                }}
+                onClick={() => handleLevelClick(level)}
+              >
+                {!isLocked && (
+                  <div className={`absolute inset-0 bg-gradient-to-br ${level.color} rounded-full blur-2xl opacity-70 scale-150 animate-pulse`}></div>
+                )}
+                
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  <svg viewBox="0 0 100 100" className="absolute w-full h-full">
+                    <defs>
+                      <filter id={`starGlow-${index}`}>
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    <polygon
+                      points="50,5 61,35 92,35 67,55 78,85 50,65 22,85 33,55 8,35 39,35"
+                      className={`${
+                        isLocked 
+                          ? 'fill-gray-600 stroke-gray-700' 
+                          : `fill-yellow-400 stroke-yellow-300`
+                      } transition-all`}
+                      strokeWidth="2"
+                      filter={!isLocked ? `url(#starGlow-${index})` : 'none'}
+                      style={{
+                        filter: !isLocked ? 'drop-shadow(0 0 10px rgba(250, 204, 21, 0.8))' : 'none'
+                      }}
+                    />
+                  </svg>
 
-          return (
-            <div
-              key={`level-${index}`}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${
-                isLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
-              }`}
-              style={{ left: `${level.x}px`, top: `${level.y}px` }}
-              onClick={() => handleLevelClick(level)}
-            >
-              {/* Glow effect for unlocked/completed */}
-              {!isLocked && (
-                <div className={`absolute inset-0 bg-gradient-to-br ${level.color} rounded-full blur-xl opacity-60 scale-125 animate-pulse`}></div>
-              )}
-              
-              {/* Main level circle */}
-              <div className={`relative w-24 h-24 rounded-full flex flex-col items-center justify-center shadow-2xl transition-all border-4 ${
-                isLocked 
-                  ? 'bg-gray-300 border-gray-400' 
-                  : `bg-gradient-to-br ${level.color} border-white`
-              }`}>
+                  {/* DEBUG: Show container center (red) and visual center (blue) */}
+                  {/*
+                  <div
+                    className="absolute w-2 h-2 bg-red-500 rounded-full z-50"
+                    style={{
+                      left: '50%',
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)'
+                    }}
+                  />
+                  
+                  <div
+                    className="absolute w-2 h-2 bg-blue-500 rounded-full z-50"
+                    style={{
+                      left: '50%',
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      marginLeft: '0px', // Adjust these values as needed
+                      marginTop: '0px'     // Based on your observation
+                    }}
+                  /> */}
+
+                  <div className={`relative z-10 flex flex-col items-center justify-center transition-all`}>
+                    {isLocked && (
+                      <Lock className="w-10 h-10 text-gray-300" />
+                    )}
+                    
+                    {isCompleted && (
+                      <CheckCircle className="w-10 h-10 text-white drop-shadow-lg" />
+                    )}
+                    
+                    {isUnlocked && !isCompleted && (
+                      <div className="text-4xl drop-shadow-lg">{level.icon}</div>
+                    )}
+                    
+                    <span className={`text-sm font-bold mt-1 ${isLocked ? 'text-gray-300' : 'text-white drop-shadow-lg'}`}>
+                      {level.level}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="absolute top-24 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                  <div className={`px-4 py-2 rounded-full text-sm font-bold shadow-lg backdrop-blur-sm ${
+                    isLocked 
+                      ? 'bg-gray-800/60 text-gray-300 border border-gray-600' 
+                      : 'bg-indigo-900/70 text-yellow-300 border border-yellow-400/50'
+                  }`}>
+                    {level.theme}
+                  </div>
+                </div>
+
                 {isLocked && (
-                  <Lock className="w-10 h-10 text-gray-600" />
+                  <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg border-2 border-red-400">
+                    {level.expRequired} EXP
+                  </div>
                 )}
-                
+
                 {isCompleted && (
-                  <CheckCircle className="w-10 h-10 text-white" />
+                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 flex gap-1">
+                    {[...Array(3)].map((_, i) => (
+                      <span key={i} className="text-2xl animate-pulse" style={{ animationDelay: `${i * 0.2}s` }}>
+                        ✨
+                      </span>
+                    ))}
+                  </div>
                 )}
-                
-                {isUnlocked && (
-                  <div className="text-4xl">{level.icon}</div>
-                )}
-                
-                <span className={`text-sm font-bold mt-1 ${isLocked ? 'text-gray-600' : 'text-white'}`}>
-                  {level.level}
-                </span>
               </div>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Level name below */}
-              <div className="absolute top-28 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                <div className={`px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
-                  isLocked 
-                    ? 'bg-gray-300 text-gray-600' 
-                    : 'bg-white text-gray-800'
-                }`}>
-                  {level.theme}
-                </div>
-              </div>
-
-              {/* EXP required badge for locked levels */}
-              {isLocked && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-                  {level.expRequired} EXP
-                </div>
-              )}
-
-              {/* Stars for completed levels */}
-              {isCompleted && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 flex gap-1">
-                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Level details panel */}
-        {selectedLevel && (
+      {/* Level details panel */}
+      {selectedLevel && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={() => setSelectedLevel(null)}
+          />
           <div
-            className="fixed bg-white rounded-3xl shadow-2xl border-4 border-purple-300 p-8 w-96 z-40 animate-in fade-in slide-in-from-bottom duration-300"
+            className="fixed bg-gradient-to-br from-indigo-900 to-purple-950 rounded-3xl shadow-2xl border-4 border-yellow-400/50 p-8 w-96 z-50 animate-in fade-in zoom-in duration-300"
             style={{
               left: '50%',
               top: '50%',
@@ -280,43 +622,51 @@ export default function StudentLBLM() {
           >
             <button
               onClick={() => setSelectedLevel(null)}
-              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors text-xl font-bold"
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-indigo-800 hover:bg-indigo-700 transition-colors text-xl font-bold text-white border-2 border-purple-400"
             >
               ✕
             </button>
 
             <div className="text-center mb-6">
-              <div className={`w-20 h-20 mx-auto mb-4 bg-gradient-to-br ${selectedLevel.color} rounded-2xl flex items-center justify-center text-5xl shadow-xl`}>
-                {selectedLevel.icon}
+              <div className="w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                  <polygon
+                    points="50,5 61,35 92,35 67,55 78,85 50,65 22,85 33,55 8,35 39,35"
+                    className="fill-yellow-400 stroke-yellow-300"
+                    strokeWidth="2"
+                    style={{ filter: 'drop-shadow(0 0 15px rgba(250, 204, 21, 1))' }}
+                  />
+                </svg>
+                <span className="absolute text-5xl">{selectedLevel.icon}</span>
               </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">{selectedLevel.theme}</h2>
-              <p className="text-lg text-gray-600">Level {selectedLevel.level}</p>
+              <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">{selectedLevel.theme}</h2>
+              <p className="text-lg text-yellow-300">Level {selectedLevel.level}</p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 mb-6">
+            <div className="bg-indigo-950/50 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-purple-500/30">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-gray-700 font-bold text-lg">Reward:</span>
-                <div className="flex items-center gap-2 text-2xl font-bold text-purple-600">
-                  <Zap className="w-6 h-6" />
+                <span className="text-purple-200 font-bold text-lg">Reward:</span>
+                <div className="flex items-center gap-2 text-2xl font-bold text-yellow-400">
+                  <Zap className="w-6 h-6 drop-shadow-lg" />
                   +{selectedLevel.expReward} EXP
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-gray-700 font-bold text-lg">Words:</span>
-                <span className="text-gray-800 font-bold text-xl">10 questions</span>
+                <span className="text-purple-200 font-bold text-lg">Words:</span>
+                <span className="text-white font-bold text-xl">10 questions</span>
               </div>
             </div>
 
             {getLevelState(selectedLevel) === 'completed' ? (
               <div className="space-y-3">
-                <div className="bg-green-100 border-2 border-green-300 rounded-2xl p-4 text-center">
-                  <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-2" />
-                  <p className="text-green-800 font-bold text-lg">Completed!</p>
+                <div className="bg-green-600/30 border-2 border-green-400 rounded-2xl p-4 text-center backdrop-blur-sm">
+                  <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-2" />
+                  <p className="text-green-200 font-bold text-lg">Completed!</p>
                 </div>
                 <button
                   onClick={() => startQuiz(selectedLevel)}
-                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-xl rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+                  className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-xl rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all border-2 border-cyan-300"
                 >
                   Practice Again
                 </button>
@@ -324,42 +674,50 @@ export default function StudentLBLM() {
             ) : (
               <button
                 onClick={() => startQuiz(selectedLevel)}
-                className="w-full py-5 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 text-white font-bold text-2xl rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all"
+                className="w-full py-5 bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 text-indigo-900 font-bold text-2xl rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all border-2 border-yellow-300"
               >
-                Start Quiz! 🚀
+                Start Quest! 🚀
               </button>
             )}
 
-            {/* Demo button to simulate completion */}
             {getLevelState(selectedLevel) !== 'completed' && (
               <button
                 onClick={() => completeLevel(selectedLevel)}
-                className="w-full mt-3 py-2 bg-gray-200 text-gray-700 font-semibold text-sm rounded-xl hover:bg-gray-300 transition-all"
+                className="w-full mt-3 py-2 bg-indigo-800/50 text-purple-200 font-semibold text-sm rounded-xl hover:bg-indigo-700/50 transition-all border border-purple-500/30"
               >
                 (Demo: Complete Level)
               </button>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Fixed legend at bottom */}
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-xl border-2 border-gray-200 px-6 py-3 flex items-center gap-6 z-20">
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-indigo-900/90 backdrop-blur-md rounded-2xl shadow-xl border-2 border-purple-500/50 px-6 py-3 flex items-center gap-6 z-20">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-            <Lock className="w-4 h-4 text-gray-600" />
+          <div className="w-8 h-8 flex items-center justify-center">
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <polygon points="50,5 61,35 92,35 67,55 78,85 50,65 22,85 33,55 8,35 39,35" className="fill-gray-600 stroke-gray-700" strokeWidth="2" />
+            </svg>
           </div>
-          <span className="text-sm font-semibold text-gray-700">Locked</span>
+          <span className="text-sm font-semibold text-gray-300">Locked</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full"></div>
-          <span className="text-sm font-semibold text-gray-700">Available</span>
+          <div className="w-8 h-8 flex items-center justify-center">
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <polygon points="50,5 61,35 92,35 67,55 78,85 50,65 22,85 33,55 8,35 39,35" className="fill-yellow-400 stroke-yellow-300" strokeWidth="2" />
+            </svg>
+          </div>
+          <span className="text-sm font-semibold text-yellow-300">Available</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center">
-            <CheckCircle className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 flex items-center justify-center relative">
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <polygon points="50,5 61,35 92,35 67,55 78,85 50,65 22,85 33,55 8,35 39,35" className="fill-yellow-400 stroke-yellow-300" strokeWidth="2" />
+            </svg>
+            <CheckCircle className="w-5 h-5 text-white absolute" style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.5))' }} />
           </div>
-          <span className="text-sm font-semibold text-gray-700">Completed</span>
+          <span className="text-sm font-semibold text-green-300">Completed</span>
         </div>
       </div>
     </div>

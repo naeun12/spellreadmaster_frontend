@@ -4,6 +4,13 @@ import { Link } from 'react-router-dom';
 const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
   const [isContentOpen, setIsContentOpen] = React.useState(false);
 
+  const handleNavigation = () => {
+    // Close sidebar on mobile when navigating
+    if (window.innerWidth < 768 && isSidebarOpen) {
+      toggleSidebar();
+    }
+  };
+
   return (
     <>
       {/* Hamburger Button for Mobile */}
@@ -29,7 +36,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed flex flex-col top-14 left-0 w-14 md:w-64 bg-amber-50 h-full text-white transition-all duration-300 border-none z-10 sidebar overflow-y-auto
+        className={`fixed flex flex-col top-14 left-0 w-14 md:w-64 bg-amber-50 h-full text-white transition-all duration-300 ease-in-out border-none z-10 sidebar overflow-y-auto
           ${isSidebarOpen ? 'w-64' : 'w-14'} md:w-64`}
       >
         <div className="flex flex-col justify-between flex-grow py-4">
@@ -48,6 +55,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
               <Link
                 to="/StudentPage"
                 className="relative flex flex-row items-center h-11 focus:outline-none hover:bg-[#FCC636] text-black hover:text-white border-l-4 border-transparent hover:border-[#FCC636] pr-6"
+                onClick={handleNavigation}
               >
                 <span className="inline-flex justify-center items-center ml-4">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,6 +76,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
               <Link
                 to="/StudentPage/#"
                 className="relative flex flex-row items-center h-11 focus:outline-none hover:bg-[#FCC636] text-black hover:text-white border-l-4 border-transparent hover:border-[#FCC636] pr-6"
+                onClick={handleNavigation}
               >
                 <span className="inline-flex justify-center items-center ml-4">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,6 +119,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
                     <Link
                       to="/StudentPage/thematic-learning-mode"
                       className="block py-2 text-black px-4 hover:bg-[#FCC636] hover:text-white rounded-md text-sm"
+                      onClick={handleNavigation}
                     >
                       Thematic Learning Mode
                     </Link>
@@ -118,6 +128,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
                     <Link
                       to="/StudentPage/story-mode"
                       className="block py-2 px-4 text-black hover:bg-[#FCC636] hover:text-white rounded-md text-sm"
+                      onClick={handleNavigation}
                     >
                       Story Mode
                     </Link>
@@ -126,6 +137,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
                     <Link
                       to="/StudentPage/level-based-learning-mode"
                       className="block py-2 px-4 text-black hover:bg-[#FCC636] hover:text-white rounded-md text-sm"
+                      onClick={handleNavigation}
                     >
                       Level-Based Learning Mode
                     </Link>
@@ -148,6 +160,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
               <a
                 href="#"
                 className="relative flex flex-row items-center h-11 focus:outline-none hover:bg-[#FCC636] text-black hover:text-white border-l-4 border-transparent hover:border-[#FCC636] pr-6"
+                onClick={handleNavigation}
               >
                 <span className="inline-flex justify-center items-center ml-4">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -168,6 +181,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
               <a
                 href="#"
                 className="relative flex flex-row items-center h-11 focus:outline-none hover:bg-[#FCC636] text-black hover:text-white border-l-4 border-transparent hover:border-[#FCC636] pr-6"
+                onClick={handleNavigation}
               >
                 <span className="inline-flex justify-center items-center ml-4">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,7 +209,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
       {/* Backdrop for mobile */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/30 z-9 md:hidden"
+          className="fixed inset-0 bg-black/30 z-9 md:hidden transition-opacity duration-300 ease-in-out"
           onClick={toggleSidebar}
         ></div>
       )}

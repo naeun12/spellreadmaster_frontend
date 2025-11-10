@@ -58,7 +58,7 @@ const Header = () => {
 
   return (
     <>
-      <header className="fixed w-full top-0 left-0 z-50 bg-gradient-to-r from-orange-400 to-red-400 shadow-lg">
+      <header className="fixed w-full top-0 left-0 z-50 bg-gradient-to-r from-orange-400 to-red-400 shadow-lg transition-all duration-300 ease-in-out">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -109,8 +109,8 @@ const Header = () => {
 
       {/* Logout Confirmation Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-sm mx-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-sm mx-4 shadow-2xl transform transition-transform duration-300 ease-in-out scale-100">
             <div className="text-center">
               <div className="text-6xl mb-4">👋</div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">See You Soon!</h3>
