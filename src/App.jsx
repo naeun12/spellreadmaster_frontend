@@ -236,9 +236,7 @@ const App = () => {
         path="/StudentPage/thematic-learning-mode"
         element={
           <ProtectedRoute allowedRoles={['student']}>
-            <MainLayout>
               <StudentTLMPage />
-            </MainLayout>
           </ProtectedRoute>
         }
       /> 

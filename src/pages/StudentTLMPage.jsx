@@ -1,12 +1,12 @@
 import React from 'react';
-import StudentLayout from '../components/StudentDashboard/StudentLayout';
+import GameLayout from '../components/Layout/GameLayout';
 import StudentTLM from '../components/StudentDashboard/StudentTLM';
 
 function StudentTLMPage() {
   return (
-    <StudentLayout>
+    <GameLayout>
       <StudentTLM></StudentTLM>
-    </StudentLayout>
+    </GameLayout>
   );
 }
 
