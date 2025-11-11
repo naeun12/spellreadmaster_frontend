@@ -1,12 +1,12 @@
 import React from 'react';
-import StudentLayout from '../components/StudentDashboard/StudentLayout';
+import GameLayout from '../components/Layout/GameLayout';
 import StudentLBLM from '../components/StudentDashboard/StudentLBLM';
 
 function StudentLBLMPage() {
   return (
-    
+    <GameLayout>
       <StudentLBLM></StudentLBLM>
-    
+    </GameLayout>
   );
 }
 

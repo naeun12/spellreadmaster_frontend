@@ -29,7 +29,7 @@ import StudentLBLM from './components/StudentDashboard/StudentLBLM';
 // Layouts
 import HomeLayout from './components/Layout/HomeLayout';
 import MainLayout from './components/Layout/MainLayout';
-import GameLayout from './components/Layout/GameLayout';
+
 
 const App = () => {
   return (
@@ -225,10 +225,8 @@ const App = () => {
       <Route
         path="/StudentPage/level-based-learning-mode"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
-            <MainLayout>
-              <StudentLBLMPage />
-            </MainLayout>
+          <ProtectedRoute allowedRoles={['student']}>            
+              <StudentLBLMPage />            
           </ProtectedRoute>
         }
       /> 
@@ -250,24 +248,12 @@ const App = () => {
         path="/StudentPage/story-mode"
         element={
           <ProtectedRoute allowedRoles={['student']}>
-            <MainLayout>
               <StudentSMPage />
-            </MainLayout>
           </ProtectedRoute>
         }
       /> 
 
-      {/* Protected Student Page - Level-Based */}
-      <Route
-        path="/StudentPage/level-based-learning-mode"
-        element={
-          <ProtectedRoute allowedRoles={['student']}>
-            <GameLayout>
-              <StudentLBLM />
-            </GameLayout>
-          </ProtectedRoute>
-        }
-      /> 
+
 
       {/* Redirect unknown paths */}
       <Route path="*" element={<Navigate to="/" />} />
