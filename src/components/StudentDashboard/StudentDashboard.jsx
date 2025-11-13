@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Play, Lock, CheckCircle } from 'lucide-react';
 import { auth, db } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; // Removed collection, getDocs, updateDoc
 import { onAuthStateChanged } from 'firebase/auth';
+// Removed import { createAvatar } from '@dicebear/core';
+// Removed import { funEmoji } from '@dicebear/collection';
 
 const StudentDashboard = () => {
   const [selectedMode, setSelectedMode] = useState(null);
@@ -20,7 +22,7 @@ const StudentDashboard = () => {
             setStudentData({
               name: data.fullName || data.name || "Student",
               grade: data.grade || "Grade 2",
-              avatar: data.avatar || "👧",
+              avatar: data.avatar || "👧", // Fallback to emoji if no avatar
               totalPoints: data.totalPoints || 0,
               streak: data.streak || 0,
               level: data.level || 1,
@@ -150,7 +152,21 @@ const StudentDashboard = () => {
       <div className="bg-gradient-to-r from-yellow-300 via-orange-300 to-red-300 rounded-2xl p-8 text-white shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-5xl mb-2">{studentData.avatar}</div>
+            {/* This is the key fix - render SVG properly */}
+            <div className="text-5xl mb-2">
+              {studentData.avatar.startsWith('<svg') ? (
+                <div className="inline-block" style={{ width: '64px', height: '64px' }}>
+                  <svg
+                    dangerouslySetInnerHTML={{ __html: studentData.avatar.replace(/<svg[^>]*>/, '<svg>') }}
+                    width="64"
+                    height="64"
+                    viewBox="0 0 200 200"
+                  />
+                </div>
+              ) : (
+                <span>{studentData.avatar}</span>
+              )}
+            </div>
             <h1 className="text-4xl font-bold mb-2">Welcome back, {studentData.name.split(' ')[0]}! 🎉</h1>
             <p className="text-lg opacity-90">Ready for another awesome learning adventure?</p>
           </div>

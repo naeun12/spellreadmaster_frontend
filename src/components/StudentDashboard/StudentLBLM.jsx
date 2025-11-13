@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, CheckCircle, Zap } from 'lucide-react';
+import { auth, db } from '../../firebase'; // adjust path as needed - FIXED
+import { doc, getDoc } from 'firebase/firestore';
 
 // Add custom animations
 const styles = `
@@ -77,9 +79,9 @@ export default function StudentLBLM() {
   const containerRef = useRef(null);
   //const [isAnimating, setIsAnimating] = useState(false);
   
-  // Student progress state
+  // Student progress state - now loaded from Firestore
   const [studentData, setStudentData] = useState({
-    totalExp: 150,
+    totalExp: 0, // Will be loaded from Firestore
     currentLevel: 1,
     completedLevels: [],
     currentLevelProgress: 0,
@@ -87,10 +89,12 @@ export default function StudentLBLM() {
     weakAreas: ['vowels', 'consonant blends']
   });
 
+  const [isLoading, setIsLoading] = useState(true);
+
   const verticalOffset = -100;
 
-  // Level configuration
-  const levelConfig = [
+  // Level configuration - now dynamic
+  const [levelConfig, setLevelConfig] = useState([
     { level: 1, expRequired: 0, expReward: 50, theme: 'Short Vowels', icon: '🔤', color: 'from-blue-400 to-cyan-400' },
     { level: 2, expRequired: 50, expReward: 75, theme: 'Long Vowels', icon: '📝', color: 'from-green-400 to-emerald-400' },
     { level: 3, expRequired: 125, expReward: 100, theme: 'Consonant Blends', icon: '🎯', color: 'from-purple-400 to-pink-400' },
@@ -98,12 +102,80 @@ export default function StudentLBLM() {
     { level: 5, expRequired: 350, expReward: 150, theme: 'Rhyming Words', icon: '🎵', color: 'from-yellow-400 to-amber-400' },
     { level: 6, expRequired: 500, expReward: 175, theme: 'Word Families', icon: '👨‍👩‍👧', color: 'from-rose-400 to-pink-400' },
     { level: 7, expRequired: 675, expReward: 200, theme: 'Challenge Words', icon: '🏆', color: 'from-violet-400 to-purple-400' }
-  ];
+  ]);
 
   const [levels, setLevels] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const levelSpacing = 250;
 
+  // Load student data from Firestore
+  useEffect(() => {
+    const loadStudentData = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          console.error("❌ No authenticated user");
+          return;
+        }
+
+        const studentDoc = await getDoc(doc(db, 'students', user.uid));
+        if (studentDoc.exists()) {
+          const data = studentDoc.data();
+          setStudentData({
+            totalExp: data.totalExp || 0,
+            currentLevel: data.currentLevel || 1,
+            completedLevels: data.completedLevels || [],
+            skillLevel: data.skillLevel || 'beginner',
+            weakAreas: data.weakAreas || []
+          });
+        }
+
+        // Load AI-generated levels metadata if available
+        const quizDoc = await getDoc(doc(db, 'studentLevelQuizzes', user.uid));
+        if (quizDoc.exists()) {
+          const quizData = quizDoc.data();
+          const existingLevels = quizData.quizzes || {};
+          
+          // Update level config based on available AI-generated quizzes
+          const updatedConfig = [];
+          for (let i = 1; i <= 20; i++) { // Support up to 20 levels dynamically
+            const levelKey = `level_${i}`;
+            const quiz = existingLevels[levelKey];
+            
+            if (quiz) {
+              updatedConfig.push({
+                level: i,
+                expRequired: calculateExpRequired(i),
+                expReward: 50 + i * 10,
+                theme: quiz.theme || `Level ${i}`,
+                icon: getLevelIcon(i),
+                color: getLevelColor(i)
+              });
+            } else {
+              // Use default theme for future levels
+              updatedConfig.push({
+                level: i,
+                expRequired: calculateExpRequired(i),
+                expReward: 50 + i * 10,
+                theme: getLevelTheme(i),
+                icon: getLevelIcon(i),
+                color: getLevelColor(i)
+              });
+            }
+          }
+          setLevelConfig(updatedConfig);
+        }
+      } catch (error) {
+        console.error("💥 Failed to load student data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStudentData();
+  }, []);
+
+  // Generate levels based on current config
   const generateLevels = () => {
     const newLevels = [];
     const screenHeight = window.innerHeight - 200;
@@ -127,12 +199,14 @@ export default function StudentLBLM() {
   };
 
   useEffect(() => {
-    generateLevels();
-    // Center on first level initially
-    setTimeout(() => {
-      centerOnLevel(levelConfig[0]);
-    }, 100);
-  }, []);
+    if (!isLoading) {
+      generateLevels();
+      // Center on first level initially
+      setTimeout(() => {
+        centerOnLevel(levelConfig[0]);
+      }, 100);
+    }
+  }, [levelConfig, isLoading]);
 
   const centerOnLevel = (level) => {
     if (!containerRef.current) return;
@@ -170,24 +244,177 @@ export default function StudentLBLM() {
     setSelectedLevel(level);
   };
 
-  const startQuiz = async (level) => {
-    console.log('Starting quiz for level:', level.level);
-    alert(`Starting ${level.theme} quiz! (Connect to AI API here)`);
+  // 🔧 Updated startQuiz to connect to AI backend
+const startQuiz = async (level) => {
+  console.log('Starting quiz for level:', level.level);
+  
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("❌ Please log in first!");
+      return;
+    }
+    
+    const idToken = await user.getIdToken();
+    
+    // ✅ CORRECT ENDPOINT NAME: /get-quiz/:level
+    const response = await fetch(`http://localhost:5000/get-quiz/${level.level}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${idToken}`, // ✅ Required for authentication
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const quizData = await response.json();
+      console.log('Loaded quiz for level:', level.level, quizData);
+      alert(`Starting ${level.theme} quiz! Questions loaded from AI backend.`);
+    } else {
+      // ✅ CORRECT FALLBACK: /generate-single-quiz (POST)
+      const generateResponse = await fetch('http://localhost:5000/generate-single-quiz', {
+        method: 'POST', // ✅ Must be POST
+        headers: {
+          'Authorization': `Bearer ${idToken}`, // ✅ Required for authentication
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          level: level.level,
+          grade: 1,
+          weakAreas: studentData.weakAreas,
+          skillLevel: studentData.skillLevel
+        })
+      });
+
+      if (generateResponse.ok) {
+        console.log('Generated new quiz for level:', level.level);
+        // Try to get the quiz again after generation
+        const retryResponse = await fetch(`http://localhost:5000/get-quiz/${level.level}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (retryResponse.ok) {
+          const quizData = await retryResponse.json();
+          console.log('Loaded generated quiz for level:', level.level, quizData);
+          alert(`Starting ${level.theme} quiz! AI generated new questions.`);
+        }
+      } else {
+        alert(`Failed to generate quiz for level ${level.level}. Using demo mode.`);
+      }
+    }
+  } catch (error) {
+    console.error("💥 Error starting quiz:", error);
+    alert("Failed to load quiz. Please try again.");
+  }
+};
+
+  // 🔧 Updated completeLevel to connect to backend
+  const completeLevel = async (level) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const idToken = await user.getIdToken();
+      
+      // Submit quiz results to backend (even if it's just a demo completion)
+      const response = await fetch(`http://localhost:5000/submit-quiz/${level.level}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userAnswers: [], // In demo mode, no actual answers
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Quiz submitted successfully:', result);
+        
+        // Update local state
+        setStudentData(prev => ({
+          ...prev,
+          totalExp: prev.totalExp + level.expReward,
+          completedLevels: [...new Set([...prev.completedLevels, level.level])]
+        }));
+      } else {
+        // If backend call fails, still update local state for demo
+        setStudentData(prev => ({
+          ...prev,
+          totalExp: prev.totalExp + level.expReward,
+          completedLevels: [...new Set([...prev.completedLevels, level.level])]
+        }));
+      }
+    } catch (error) {
+      console.error("💥 Error completing level:", error);
+      // Still update local state
+      setStudentData(prev => ({
+        ...prev,
+        totalExp: prev.totalExp + level.expReward,
+        completedLevels: [...new Set([...prev.completedLevels, level.level])]
+      }));
+    }
+
+    setSelectedLevel(null);
   };
 
-  const completeLevel = (level) => {
-    setStudentData(prev => ({
-      ...prev,
-      totalExp: prev.totalExp + level.expReward,
-      completedLevels: [...prev.completedLevels, level.level]
-    }));
-    setSelectedLevel(null);
+  // Helper functions for dynamic level generation
+  const calculateExpRequired = (levelNum) => {
+    if (levelNum === 1) return 0;
+    return 50 * (levelNum - 1) + 50; // Simple formula: 50, 100, 150, etc.
+  };
+
+  const getLevelTheme = (levelNum) => {
+    const themes = [
+      'Short Vowels', 'Long Vowels', 'Consonant Blends', 'Sight Words',
+      'Rhyming Words', 'Word Families', 'Challenge Words', 'Silent Letters',
+      'Prefixes & Suffixes', 'Context Clues', 'Advanced Vocabulary'
+    ];
+    return themes[(levelNum - 1) % themes.length];
+  };
+
+  const getLevelIcon = (levelNum) => {
+    const icons = ['🔤', '📝', '🎯', '👀', '🎵', '👨‍👩‍👧', '🏆', '🤫', '⚡', '🧠', '📖'];
+    return icons[(levelNum - 1) % icons.length];
+  };
+
+  const getLevelColor = (levelNum) => {
+    const colors = [
+      'from-blue-400 to-cyan-400',
+      'from-green-400 to-emerald-400',
+      'from-purple-400 to-pink-400',
+      'from-orange-400 to-red-400',
+      'from-yellow-400 to-amber-400',
+      'from-rose-400 to-pink-400',
+      'from-violet-400 to-purple-400',
+      'from-red-400 to-pink-400',
+      'from-teal-400 to-cyan-400',
+      'from-indigo-400 to-violet-400'
+    ];
+    return colors[(levelNum - 1) % colors.length];
   };
 
   const contentWidth = (levelConfig.length - 1) * levelSpacing + 800;
   const nextLevelExp = levelConfig.find(l => l.expRequired > studentData.totalExp)?.expRequired || levelConfig[levelConfig.length - 1].expRequired;
   const progressPercent = ((studentData.totalExp - (levelConfig[studentData.completedLevels.length]?.expRequired || 0)) / 
     ((nextLevelExp - (levelConfig[studentData.completedLevels.length]?.expRequired || 0)) || 1)) * 100;
+
+  if (isLoading) {
+    return (
+      <div className="h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+          <p className="text-white text-xl">Loading your learning journey...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 overflow-hidden relative">
@@ -230,26 +457,6 @@ export default function StudentLBLM() {
           />
         ))}
       </div>
-
-      {/* Speed effect lines when animating 
-      {isAnimating && (
-        <div className="absolute inset-0 pointer-events-none z-50">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={`speed-${i}`}
-              className="absolute h-1 bg-white rounded-full"
-              style={{
-                top: `${Math.random() * 100}%`,
-                left: '50%',
-                width: '100px',
-                animation: 'speedEffect 0.5s ease-out infinite',
-                animationDelay: `${i * 0.05}s`,
-                opacity: 0.3
-              }}
-            />
-          ))}
-        </div>
-      )}*/}
 
       {/* Shooting star - FIXED: No layout shift */}
       <div className="absolute top-20 left-0 w-full h-1 pointer-events-none z-10 overflow-hidden">

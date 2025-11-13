@@ -10,4 +10,4 @@ function StudentSMPage() {
   );
 }
 
-export default StudentSMPage;
+export default StudentSMPage; 

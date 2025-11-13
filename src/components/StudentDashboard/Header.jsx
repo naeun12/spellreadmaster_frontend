@@ -1,4 +1,3 @@
-// Header.jsx (for student)
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
@@ -62,7 +61,22 @@ const Header = () => {
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="text-3xl">{studentData.avatar}</div>
+              {/* This is the key fix - render SVG properly in Header */}
+              <div className="text-3xl">
+                {studentData.avatar.startsWith('<svg') ? (
+                  <div className="inline-block" style={{ width: '48px', height: '48px' }}>
+                    <svg
+                      dangerouslySetInnerHTML={{ __html: studentData.avatar.replace(/<svg[^>]*>/, '<svg>') }}
+                      width="48"
+                      height="48"
+                      viewBox="0 0 200 200"
+                    />
+                  </div>
+                ) : (
+                  <span>{studentData.avatar}</span>
+                )}
+              </div>
+              
               <div className="text-white">
                 <div className="text-lg font-bold">{studentData.name}</div>
                 <div className="text-sm opacity-90">{studentData.grade}</div>
