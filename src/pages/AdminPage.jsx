@@ -1,6 +1,6 @@
 import React from 'react';
 import AdminLayout from '../components/AdminDashboard/AdminLayout';
-import DashboardCards from '../components/AdminDashboard/dashboardCards';
+import DashboardCards from '../components/AdminDashboard/DashboardCards';
 import RecentAccountsTable from '../components/AdminDashboard/RecentAccountsTable';
 import RecentActivities from '../components/AdminDashboard/RecentActivities'; // New import
 
