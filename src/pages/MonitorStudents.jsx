@@ -1,10 +1,11 @@
 import React from 'react'
 import TeacherLayout from '../components/TeacherDashboard/TeacherLayout';
+import MonitorStudentProgress from '../components/TeacherDashboard/MonitorStudentProgress';
 
 const MonitorStudents = () => {
   return (
     <TeacherLayout>
-        {/* <CsvUploadForm></CsvUploadForm> */}
+        <MonitorStudentProgress></MonitorStudentProgress>
     </TeacherLayout>
   )
 }

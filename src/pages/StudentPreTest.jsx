@@ -3,49 +3,56 @@ import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase'; // adjust path as needed
 import { Volume2, Check, X } from 'lucide-react';
+import { authenticatedFetch } from '../api';
 
 // Grade 1 appropriate words for Philippine students
 // Following DepEd K-12 curriculum for Grade 1
 // Inspired by Orton-Gillingham phonics sequence
-// Note: Not strictly sequential — used for broad diagnostic assessment
+// Total words: 20 | Total EXP: 300 (6×10 + 8×15 + 6×20)
 const PRETEST_WORDS = [
-  // ✅ Section 1: CVC Words (Consonant-Vowel-Consonant)
-  { word: 'cat', difficulty: 'easy', points: 10, emoji: '🐱' },
-  { word: 'dog', difficulty: 'easy', points: 10, emoji: '🐕' },
-  { word: 'sun', difficulty: 'easy', points: 10, emoji: '☀️' },
-  { word: 'pen', difficulty: 'easy', points: 10, emoji: '🖊️' },
-  { word: 'bag', difficulty: 'easy', points: 10, emoji: '🎒' },
+  // ✅ Section 1: CVC Words (phonics_level_1) - 6 words x 10 EXP = 60 EXP
+  { word: 'cat', difficulty: 'easy', type: 'phonics_level_1', emoji: '🐱', exampleSentence: 'The cat is sleeping on the mat.', phonicsPattern: 'CVC', addedBy: 'system', expValue: 10 },
+  { word: 'dog', difficulty: 'easy', type: 'phonics_level_1', emoji: '🐕', exampleSentence: 'The dog barks at the mailman.', phonicsPattern: 'CVC', addedBy: 'system', expValue: 10 },
+  { word: 'sun', difficulty: 'easy', type: 'phonics_level_1', emoji: '☀️', exampleSentence: 'The sun shines brightly in the sky.', phonicsPattern: 'CVC', addedBy: 'system', expValue: 10 },
+  { word: 'pen', difficulty: 'easy', type: 'phonics_level_1', emoji: '🖊️', exampleSentence: 'I use my pen to write my name.', phonicsPattern: 'CVC', addedBy: 'system', expValue: 10 },
+  { word: 'bag', difficulty: 'easy', type: 'phonics_level_1', emoji: '🎒', exampleSentence: 'My bag is full of books and crayons.', phonicsPattern: 'CVC', addedBy: 'system', expValue: 10 },
+  { word: 'hat', difficulty: 'easy', type: 'phonics_level_1', emoji: '👒', exampleSentence: 'She wears a red hat when it rains.', phonicsPattern: 'CVC', addedBy: 'system', expValue: 10 },
 
-  // ✅ Section 2: Blends & Digraphs
-  { word: 'fish', difficulty: 'medium', points: 15, emoji: '🐟' },  // sh
-  { word: 'duck', difficulty: 'medium', points: 15, emoji: '🦆' },  // ck
-  { word: 'ball', difficulty: 'medium', points: 15, emoji: '⚽' },  // ll
-  { word: 'jump', difficulty: 'medium', points: 15, emoji: '🏃' },  // mp
-  { word: 'flag', difficulty: 'medium', points: 15, emoji: '🚩' },  // fl
+  // ✅ Section 2: Blends & Digraphs (phonics_level_2) - 8 words x 15 EXP = 120 EXP
+  { word: 'fish', difficulty: 'medium', type: 'phonics_level_2', emoji: '🐟', exampleSentence: 'The fish swims in the blue sea.', phonicsPattern: 'digraph_sh', addedBy: 'system', expValue: 15 },
+  { word: 'duck', difficulty: 'medium', type: 'phonics_level_2', emoji: '🦆', exampleSentence: 'The duck waddles near the pond.', phonicsPattern: 'digraph_ck', addedBy: 'system', expValue: 15 },
+  { word: 'ball', difficulty: 'medium', type: 'phonics_level_2', emoji: '⚽', exampleSentence: 'We play ball in the schoolyard.', phonicsPattern: 'double_consonant_ll', addedBy: 'system', expValue: 15 },
+  { word: 'jump', difficulty: 'medium', type: 'phonics_level_2', emoji: '🏃', exampleSentence: 'I jump over the puddle after rain.', phonicsPattern: 'blend_mp', addedBy: 'system', expValue: 15 },
+  { word: 'flag', difficulty: 'medium', type: 'phonics_level_2', emoji: '🚩', exampleSentence: 'The flag waves in the wind at school.', phonicsPattern: 'blend_fl', addedBy: 'system', expValue: 15 },
+  { word: 'ship', difficulty: 'medium', type: 'phonics_level_2', emoji: '🚢', exampleSentence: 'The ship sails across the ocean.', phonicsPattern: 'digraph_sh', addedBy: 'system', expValue: 15 },
+  { word: 'nest', difficulty: 'medium', type: 'phonics_level_2', emoji: '🐦', exampleSentence: 'The bird sits in its cozy nest.', phonicsPattern: 'blend_st', addedBy: 'system', expValue: 15 },
+  { word: 'milk', difficulty: 'medium', type: 'phonics_level_2', emoji: '🥛', exampleSentence: 'I drink milk with my breakfast.', phonicsPattern: 'blend_ml', addedBy: 'system', expValue: 15 },
 
-  // ✅ Section 3: Long Vowels & Vowel Teams (Decodable)
-  { word: 'cake', difficulty: 'hard', points: 20, emoji: '🎂' },    // silent e
-  { word: 'rain', difficulty: 'hard', points: 20, emoji: '🌧️' },    // ai
-  { word: 'play', difficulty: 'hard', points: 20, emoji: '🎮' },    // ay
-  { word: 'snow', difficulty: 'hard', points: 20, emoji: '❄️' },    // ow — replaced "come"
-  { word: 'they', difficulty: 'hard', points: 20, emoji: '🧑‍🤝‍🧑' }  // sight word (irregular — keep one)
+  // ✅ Section 3: Long Vowels & Vowel Teams (phonics_level_3) - 6 words x 20 EXP = 120 EXP
+  { word: 'cake', difficulty: 'hard', type: 'phonics_level_3', emoji: '🎂', exampleSentence: 'We ate a big cake on my birthday.', phonicsPattern: 'silent_e', addedBy: 'system', expValue: 20 },
+  { word: 'rain', difficulty: 'hard', type: 'phonics_level_3', emoji: '🌧️', exampleSentence: 'The rain makes the flowers grow.', phonicsPattern: 'vowel_team_ai', addedBy: 'system', expValue: 20 },
+  { word: 'play', difficulty: 'hard', type: 'phonics_level_3', emoji: '🎮', exampleSentence: 'We play tag after school.', phonicsPattern: 'vowel_team_ay', addedBy: 'system', expValue: 20 },
+  { word: 'snow', difficulty: 'hard', type: 'phonics_level_3', emoji: '❄️', exampleSentence: 'The snow is cold and white.', phonicsPattern: 'vowel_team_ow', addedBy: 'system', expValue: 20 },
+  { word: 'they', difficulty: 'hard', type: 'phonics_level_3', emoji: '🧑‍🤝‍🧑', exampleSentence: 'They are my best friends at school.', phonicsPattern: 'sight_word_irregular', addedBy: 'system', expValue: 20 },
+  { word: 'tree', difficulty: 'hard', type: 'phonics_level_3', emoji: '🌳', exampleSentence: 'The tall tree gives us shade.', phonicsPattern: 'vowel_team_ee', addedBy: 'system', expValue: 20 }
 ];
 
 // 🔑 PRETEST_METADATA — Updated for Orton-Gillingham alignment
 const PRETEST_METADATA = {
-  id: "pretest-v1-2025",                           // Version identifier
+  id: "pretest-v1-2025",
   name: "Grade 1 Spelling Diagnostic (OG-Inspired)",
   dateCreated: "2025-04-01",
-  totalWords: 15,
-  description: "Standardized diagnostic assessing foundational phonics skills aligned with Orton-Gillingham principles: CVC words, blends/digraphs, and long vowels. Used to determine starting level for adaptive learning.",
+  totalWords: PRETEST_WORDS.length,
+  description: "Standardized diagnostic assessing foundational phonics skills aligned with Orton-Gillingham principles: CVC words, blends/digraphs, and long vowels. Determines adaptive learning start level.",
   grade: 1,
-  wordList: PRETEST_WORDS.map(w => w.word),        // Full list for audit trail
-  phonicsCoverage: ["CVC", "consonant_blend", "digraph", "silent_e", "vowel_team", "sight_word"],
+  wordList: PRETEST_WORDS.map(w => w.word),
+  phonicsCoverage: ["CVC", "blend", "digraph", "silent_e", "vowel_team", "sight_word_irregular"],
   curriculumAligned: "DepEd K–12 Grade 1 English Curriculum",
-  source: "Based on Orton-Gillingham sequence and Dolch sight word list",
+  source: "SpellRead Master AI WordBank (2025 schema v1)",
   timeEstimateMinutes: 5,
   validationMethod: "Pilot-tested with 48 Grade 1 students across 3 public schools in Manila, 2025"
 };
+
 
 const markFirstLoginComplete = async () => {
   const user = auth.currentUser;
@@ -66,7 +73,7 @@ const StudentPreTest = ({ onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
   const [score, setScore] = useState(0);
-  const [totalPoints, setTotalPoints] = useState(0);
+  const [totalExp, setTotalExp] = useState(0);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [started, setStarted] = useState(false);
@@ -89,6 +96,8 @@ const StudentPreTest = ({ onComplete }) => {
     }
   };
 
+  
+
   // 🔧 Updated savePreTestScore function to integrate with AI backend
   const savePreTestScore = async (finalResults) => {
     try {
@@ -100,15 +109,23 @@ const StudentPreTest = ({ onComplete }) => {
 
       // 🔑 Calculate adaptive parameters from results
       const startingLevel = finalResults.level;
-      const skillLevel = calculateSkillLevel(finalResults.totalPoints);
+      const skillLevel = calculateSkillLevel(finalResults.totalExp);
       const weakAreas = getWeakAreasFromResults(finalResults.results);
+
+      // 🔑 Determine levels to mark as completed based on startingLevel
+      // Example: If startingLevel is 4, mark levels 1, 2, 3 as completed.
+      // Adjust this logic if your definition of "completed" differs.
+      const completedLevelsUpTo = startingLevel > 1 ? Array.from({ length: startingLevel - 1 }, (_, i) => i + 1) : [];
 
       // ✅ Save diagnostic data to student profile for AI backend
       await updateDoc(doc(db, 'students', user.uid), {
         startingLevel,
+        currentLevel: startingLevel,
+        completedLevels: completedLevelsUpTo,
+        totalExp: finalResults.totalExp,
         skillLevel,
         weakAreas,
-        pretestScore: finalResults.totalPoints,
+        pretestScore: finalResults.totalExp,
         pretestVersion: PRETEST_METADATA.id,
         lastUpdated: serverTimestamp()
       });
@@ -128,7 +145,7 @@ const StudentPreTest = ({ onComplete }) => {
         // From finalResults
         score: finalResults.score,
         totalQuestions: finalResults.totalQuestions,
-        totalPoints: finalResults.totalPoints,
+        totalExp: finalResults.totalExp,
         level: finalResults.level,
         
         // Detailed answers for analytics
@@ -138,8 +155,12 @@ const StudentPreTest = ({ onComplete }) => {
           correct: r.correct,
           difficulty: r.difficulty,
           points: r.points,
-          emoji: r.emoji
+          emoji: r.emoji,
+          type: r.type,
+          phonicsPattern: r.phonicsPattern,
+          expValue: r.expValue
         })),
+
         
         // Performance analytics
         correctAnswers: finalResults.results.filter(r => r.correct).length,
@@ -172,23 +193,17 @@ const StudentPreTest = ({ onComplete }) => {
 
       // 🔧 CALL AI BACKEND TO GENERATE INITIAL LEVELS
       try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('http://localhost:5000/generate-levels', {
+        const response = await authenticatedFetch('http://localhost:5000/quiz/generate-levels', { // ✅ Use authenticatedFetch
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
-          },
           body: JSON.stringify({
             startingLevel,
-            grade: 1,
-            weakAreas,
-            skillLevel
+            weakAreas,     // e.g., { "phonics_level_2": ["digraph_sh"] }
+            // ❌ Removed: grade, skillLevel
           })
         });
 
         if (response.ok) {
-          console.log("✅ AI-generated levels 1-10 created successfully!");
+          console.log("✅ AI-generated levels created successfully!");
         } else {
           const errorData = await response.json();
           console.error("❌ Failed to generate AI levels:", errorData);
@@ -203,34 +218,29 @@ const StudentPreTest = ({ onComplete }) => {
     }
   };
 
-  // Helper function: Extract weak areas from results
-  const getWeakAreasFromResults = (results) => {
-    const difficultyCounts = {
-      easy: { total: 0, correct: 0 },
-      medium: { total: 0, correct: 0 },
-      hard: { total: 0, correct: 0 }
-    };
+// Helper function: Extract weak areas from results
+const getWeakAreasFromResults = (results) => {
+  const weakAreas = {}; // ← This is an OBJECT, not an array!
 
-    results.forEach(result => {
-      difficultyCounts[result.difficulty].total++;
-      if (result.correct) difficultyCounts[result.difficulty].correct++;
-    });
+  results.forEach(result => {
+    if (!result.correct) {
+      const type = result.type;
+      const pattern = result.phonicsPattern;
 
-    const weakAreas = [];
-    
-    // If accuracy is below 60% in any difficulty
-    Object.entries(difficultyCounts).forEach(([difficulty, data]) => {
-      if (data.total > 0) {
-        const accuracy = (data.correct / data.total) * 100;
-        if (accuracy < 60) {
-          weakAreas.push(difficulty);
-        }
+      // Initialize the type array if needed
+      if (!weakAreas[type]) {
+        weakAreas[type] = [];
       }
-    });
 
-    return weakAreas;
-  };
+      // Add pattern if not already present
+      if (!weakAreas[type].includes(pattern)) {
+        weakAreas[type].push(pattern);
+      }
+    }
+  });
 
+  return weakAreas; // ✅ Returns { "type": ["pattern1", "pattern2"] }
+};
   // Helper function: Get phonics patterns from missed words
   const getPhonicsPatternsFromResults = (results) => {
     // This would be more useful when you have phonics data in your wordBank
@@ -252,13 +262,26 @@ const StudentPreTest = ({ onComplete }) => {
     };
   };
 
-  const calculateSkillLevel = (points) => {
-    if (points >= 250) return 'advanced';
-    if (points >= 200) return 'proficient';
-    if (points >= 150) return 'developing';
-    if (points >= 100) return 'beginning';
-    return 'emergent';
-  };
+const calculateSkillLevel = (points) => {
+  // The maximum possible totalExp from the pretest is now 300
+  const MAX_PRETEST_EXP = 300;
+
+  // Calculate thresholds based on percentage of max exp
+  const proficientThreshold = Math.floor(MAX_PRETEST_EXP * 0.75); // 0.75 * 300 = 225
+  const developingThreshold = Math.floor(MAX_PRETEST_EXP * 0.50); // 0.50 * 300 = 150
+  const beginningThreshold = Math.floor(MAX_PRETEST_EXP * 0.25);  // 0.25 * 300 = 75
+
+  // Determine skill level based on the calculated thresholds
+  if (points >= proficientThreshold) {
+    return 'proficient'; // Achieved 75% or more of max possible exp (225+)
+  } else if (points >= developingThreshold) {
+    return 'developing'; // Achieved 50% - 74.9% of max possible exp (150-224)
+  } else if (points >= beginningThreshold) {
+    return 'beginning';  // Achieved 25% - 49.9% of max possible exp (75-149)
+  } else {
+    return 'emergent';   // Achieved less than 25% of max possible exp (<75)
+  }
+};
 
   // Auto-play word when question loads
   useEffect(() => {
@@ -277,11 +300,14 @@ const StudentPreTest = ({ onComplete }) => {
     
     const newResult = {
       word: currentWord.word,
-      userAnswer: userAnswer,
-      correct: correct,
+      userAnswer,
+      correct,
       difficulty: currentWord.difficulty,
-      points: correct ? currentWord.points : 0,
-      emoji: currentWord.emoji
+      points: correct ? currentWord.expValue : 0,
+      emoji: currentWord.emoji,
+      type: currentWord.type,
+      phonicsPattern: currentWord.phonicsPattern,
+      expValue: currentWord.expValue
     };
     
     const updatedResults = [...results, newResult];
@@ -290,17 +316,17 @@ const StudentPreTest = ({ onComplete }) => {
     // Update score and points immediately
     if (correct) {
       const newScore = score + 1;
-      const newPoints = totalPoints + currentWord.points;
+      const newExp = totalExp + currentWord.expValue;
       setScore(newScore);
-      setTotalPoints(newPoints);
+      setTotalExp(newExp);
       
       // If this was the last question, prepare final results
       if (isLastQuestion) {
-        const level = calculateLevel(newPoints);
+        const level = calculateLevel(newExp);
         const finalData = {
           score: newScore,
           totalQuestions: PRETEST_WORDS.length,
-          totalPoints: newPoints,
+          totalExp: newExp,
           level: level,
           results: updatedResults
         };
@@ -308,11 +334,11 @@ const StudentPreTest = ({ onComplete }) => {
       }
     } else if (isLastQuestion) {
       // Last question but incorrect
-      const level = calculateLevel(totalPoints);
+      const level = calculateLevel(totalExp);
       const finalData = {
         score: score,
         totalQuestions: PRETEST_WORDS.length,
-        totalPoints: totalPoints,
+        totalExp: totalExp,
         level: level,
         results: updatedResults
       };
@@ -337,12 +363,24 @@ const StudentPreTest = ({ onComplete }) => {
     }
   };
 
-  const calculateLevel = (points) => {
-    if (points >= 250) return 5; // Advanced
-    if (points >= 200) return 4; // Proficient
-    if (points >= 150) return 3; // Developing
-    if (points >= 100) return 2; // Beginning
-    return 1; // Emergent
+  const MAX_PRETEST_EXP = 300;
+
+  const calculateLevel = (totalExp) => {
+    // Ensure totalExp doesn't exceed the theoretical maximum (optional safeguard)
+    const cappedExp = Math.min(totalExp, MAX_PRETEST_EXP);
+
+    // Define thresholds based on percentage of max exp or fixed ranges
+    // Example: Split into roughly equal thirds based on max possible exp
+    const level2Threshold = Math.floor(MAX_PRETEST_EXP * (1 / 3)); // 1/3 * 300 = 100
+    const level3Threshold = Math.floor(MAX_PRETEST_EXP * (2 / 3)); // 2/3 * 300 = 200
+
+    if (cappedExp >= level3Threshold) {
+      return 3; // Highest level achieved (200+ EXP)
+    } else if (cappedExp >= level2Threshold) {
+      return 2; // Middle level (100-199 EXP)
+    } else {
+      return 1; // Lowest level (0-99 EXP)
+    }
   };
 
   const getDifficultyColor = (difficulty) => {
@@ -426,9 +464,9 @@ const StudentPreTest = ({ onComplete }) => {
             </div>
             
             <div className="bg-purple-50 rounded-2xl p-6 text-center">
-              <p className="text-gray-600 text-sm mb-2">Total Points</p>
+              <p className="text-gray-600 text-sm mb-2">Total Exp</p>
               <p className="text-4xl font-bold text-purple-600">
-                {finalResults.totalPoints}
+                {finalResults.totalExp}
               </p>
             </div>
             
@@ -440,23 +478,21 @@ const StudentPreTest = ({ onComplete }) => {
             </div>
           </div>
 
-          {/* Level Description */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 mb-8">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">
-              {finalResults.level === 5 && "🌟 Advanced Reader!"}
-              {finalResults.level === 4 && "⭐ Proficient Reader!"}
-              {finalResults.level === 3 && "📚 Developing Reader!"}
-              {finalResults.level === 2 && "🌱 Beginning Reader!"}
-              {finalResults.level === 1 && "🌟 Emergent Reader!"}
-            </h3>
-            <p className="text-gray-600">
-              {finalResults.level === 5 && "Excellent work! You have unlocked all 5 levels!"}
-              {finalResults.level === 4 && "Great job! You have unlocked levels 1-4!"}
-              {finalResults.level === 3 && "Good progress! You have unlocked levels 1-3!"}
-              {finalResults.level === 2 && "Nice start! You have unlocked levels 1-2!"}
-              {finalResults.level === 1 && "Welcome! Start with level 1 and keep practicing!"}
-            </p>
-          </div>
+        {/* Level Description */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 mb-8">
+          <h3 className="text-lg font-bold text-gray-800 mb-2">
+            {finalResults.level === 4 && "🚀 Advanced Reader!"}
+            {finalResults.level === 3 && "📚 Developing Reader!"}
+            {finalResults.level === 2 && "🌱 Beginning Reader!"}
+            {finalResults.level === 1 && "🌟 Emergent Reader!"}
+          </h3>
+          <p className="text-gray-600">
+            {finalResults.level === 4 && "🌟 Amazing! You’ve mastered all foundational skills — you’re ready for Level 4 and beyond!"}
+            {finalResults.level === 3 && "Good progress! You’ve unlocked Levels 1–3!"}
+            {finalResults.level === 2 && "Nice start! You’ve unlocked Levels 1–2!"}
+            {finalResults.level === 1 && "Welcome! Start with Level 1 and keep practicing!"}
+          </p>
+        </div>
 
           {/* Detailed Results */}
           <div className="mb-8">
@@ -532,7 +568,7 @@ const StudentPreTest = ({ onComplete }) => {
         {!showFeedback ? (
           <div className="text-center">
             <div className={`inline-block px-4 py-2 rounded-full text-sm font-semibold mb-6 ${getDifficultyColor(currentWord.difficulty)}`}>
-              {currentWord.difficulty.charAt(0).toUpperCase() + currentWord.difficulty.slice(1)} Word - {currentWord.points} points
+              {currentWord.difficulty.charAt(0).toUpperCase() + currentWord.difficulty.slice(1)} Word - {currentWord.expValue} points
             </div>
 
             <div className="mb-8">
@@ -606,7 +642,7 @@ const StudentPreTest = ({ onComplete }) => {
                 <p className="text-gray-600">Your answer: <span className="font-semibold">{userAnswer}</span></p>
               )}
               {isCorrect && (
-                <p className="text-green-600 font-semibold">+{currentWord.points} points</p>
+                <p className="text-green-600 font-semibold">+{currentWord.expValue} points</p>
               )}
             </div>
 
@@ -621,7 +657,7 @@ const StudentPreTest = ({ onComplete }) => {
 
         {/* Points Display */}
         <div className="mt-6 text-center text-gray-600">
-          <p className="text-sm">Total Points: <span className="font-bold text-purple-600">{totalPoints}</span></p>
+          <p className="text-sm">Total Exp: <span className="font-bold text-purple-600">{totalExp}</span></p>
         </div>
       </div>
     </div>

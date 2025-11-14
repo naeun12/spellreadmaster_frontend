@@ -20,6 +20,7 @@ import AdminManageAccounts from './pages/AdminManageAccounts';
 import AdminMonitorStudentProgress from './pages/AdminMonitorStudentProgress';
 import ProtectedRoute from './components/ProtectedRoute';
 import StudentPage from './pages/StudentPage';
+import StudentProgress from './pages/StudentProgress';
 import StudentPreTest from './pages/StudentPreTest';
 import StudentLBLMPage from './pages/StudentLBLMPage';
 import StudentTLMPage from './pages/StudentTLMPage';
@@ -204,6 +205,18 @@ const App = () => {
           <ProtectedRoute allowedRoles={['student']}>
             <MainLayout>
               <StudentPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      /> 
+
+            {/* Protected Student Page - Monitor Progress */}
+      <Route
+        path="/StudentPage/monitor-student-progress"
+        element={
+          <ProtectedRoute allowedRoles={['student']}>
+            <MainLayout>
+              <StudentProgress />
             </MainLayout>
           </ProtectedRoute>
         }

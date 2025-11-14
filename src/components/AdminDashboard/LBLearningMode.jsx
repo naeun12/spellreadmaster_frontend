@@ -1,9 +1,11 @@
+// LBLearningMode.jsx
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, GripVertical, Eye, EyeOff, Zap, BookOpen, Target, Award, TrendingUp, TrendingDown, Gamepad2, Upload, Search, Download } from 'lucide-react';
 import { db } from '../../firebase'; // adjust path as needed
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { authenticatedFetch } from '../../api'; // Import the API helper
+import { collection, getDocs, doc, deleteDoc, getDoc } from 'firebase/firestore'; // Added getDoc for fetching admin profiles
 
-export default function LevelBasedLearningMode() {
+export default function LBLearningMode() {
   const [editingWord, setEditingWord] = useState(null);
   const [addingWord, setAddingWord] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -11,50 +13,109 @@ export default function LevelBasedLearningMode() {
 
   // WordBank data
   const [words, setWords] = useState([]);
+  // Admin profiles data (cache UID -> role)
+  const [adminProfiles, setAdminProfiles] = useState({});
 
-  // Load words from Firestore on component mount
+  // Load words and admin profiles from Firestore on component mount
   useEffect(() => {
-    const loadWords = async () => {
+    const loadWordsAndProfiles = async () => {
       setLoading(true);
       try {
         const querySnapshot = await getDocs(collection(db, 'wordBank'));
         const wordList = [];
+        const uniqueAddedByUids = new Set(); // Keep track of unique UIDs to fetch profiles for
+
         querySnapshot.forEach((doc) => {
-          wordList.push({ id: doc.id, ...doc.data() });
+          const wordData = { id: doc.id, ...doc.data() };
+          wordList.push(wordData);
+          // Collect unique UIDs from addedBy field
+          if (wordData.addedBy) {
+            uniqueAddedByUids.add(wordData.addedBy);
+          }
         });
-        setWords(wordList);
+
+        // Fetch profiles for unique UIDs from the 'admins' collection
+        const profiles = {};
+        for (const uid of uniqueAddedByUids) {
+          try {
+            // Assuming admin profiles are stored in an 'admins' collection with UID as doc ID
+            const adminDoc = await getDoc(doc(db, 'admins', uid));
+            if (adminDoc.exists) {
+              const adminData = adminDoc.data();
+              // Use the 'role' field from the admin document, fallback to UID if not found
+              profiles[uid] = adminData.role || uid;
+            } else {
+              // If admin profile doesn't exist in 'admins' collection, just show the UID
+              profiles[uid] = uid;
+            }
+          } catch (profileError) {
+            console.error(`Error fetching admin profile for UID ${uid}:`, profileError);
+            // On error, show the UID
+            profiles[uid] = uid;
+          }
+        }
+
+        setAdminProfiles(profiles); // Update the state holding the admin profiles
+        setWords(wordList); // Update the state holding the words
       } catch (error) {
-        console.error("Error loading words:", error);
-        alert("Failed to load word bank. Check connection.");
+        console.error("Error loading words or admin profiles:", error);
+        alert("Failed to load word bank or admin profiles. Check connection.");
       }
       setLoading(false);
     };
 
-    loadWords();
+    loadWordsAndProfiles();
   }, []);
 
   // Filter words based on search term
   const filteredWords = words.filter(word => 
     word.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    word.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    word.phonicsPattern.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    word.difficulty.includes(searchTerm.toLowerCase())
+    word.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    word.phonicsPattern?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    word.difficulty?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleEditWord = (word) => {
+    // Ensure the word object from Firestore (with id) is correctly set
+    console.log("Setting editingWord:", word); // Debug log
     setEditingWord({ ...word });
   };
 
   const handleSaveWord = async () => {
     setLoading(true);
     try {
-      await setDoc(doc(db, 'wordBank', editingWord.word), editingWord);
-      setWords(words.map(w => w.id === editingWord.id ? editingWord : w));
+      // Prepare data to send - only include fields the admin can edit
+      const wordDataToSend = {
+        difficulty: editingWord.difficulty,
+        phonicsPattern: editingWord.phonicsPattern,
+        emoji: editingWord.emoji,
+        exampleSentence: editingWord.exampleSentence,
+        // Do NOT include type or expValue here
+      };
+
+      console.log("Sending to edit endpoint for ID:", editingWord.id, "Data:", wordDataToSend); // Log data being sent
+
+      // Use the authenticatedFetch helper to call your backend's edit endpoint
+      const result = await authenticatedFetch(`http://localhost:5000/word/edit-word/${editingWord.id}`, { // Use editingWord.id for the URL
+        method: 'PUT',
+        body: JSON.stringify(wordDataToSend), // Send only the fields being updated
+      });
+
+      console.log("Word updated via backend:", result); // Log result from backend
+
+      // Reload from Firestore to reflect the word as saved by the backend (with new calculated type/expValue)
+      const querySnapshot = await getDocs(collection(db, 'wordBank'));
+      const wordList = [];
+      querySnapshot.forEach((doc) => {
+        wordList.push({ id: doc.id, ...doc.data() });
+      });
+      setWords(wordList);
+
       setEditingWord(null);
-      alert("✅ Word updated successfully!");
+      alert("✅ Word updated successfully via backend!");
     } catch (error) {
-      console.error("Error updating word:", error);
-      alert("Failed to update word. Please try again.");
+      console.error("Error updating word via backend:", error);
+      alert("Failed to update word via backend. Please try again. Error: " + error.message);
     }
     setLoading(false);
   };
@@ -78,12 +139,12 @@ export default function LevelBasedLearningMode() {
     setAddingWord({
       word: '',
       difficulty: 'easy',
-      type: 'CVC',
+      // Remove initial type and expValue - backend will calculate and provide them
       emoji: '📝',
       exampleSentence: '',
-      phonicsPattern: 'CVC',
-      addedBy: 'admin',
-      expValue: 10
+      phonicsPattern: '', // Start with empty phonics pattern
+      // addedBy might be set by the backend, remove from initial state if so
+      // addedBy: 'admin', // Consider removing if backend handles this
     });
   };
 
@@ -95,18 +156,44 @@ export default function LevelBasedLearningMode() {
 
     setLoading(true);
     try {
-      await setDoc(doc(db, 'wordBank', addingWord.word), addingWord);
-      setWords([...words, { ...addingWord, id: Date.now() }]);
+      // Prepare data to send - only include fields the admin can set
+      const wordDataToSend = {
+        word: addingWord.word,
+        difficulty: addingWord.difficulty,
+        phonicsPattern: addingWord.phonicsPattern,
+        emoji: addingWord.emoji,
+        exampleSentence: addingWord.exampleSentence,
+        // Do NOT include type or expValue here
+      };
+
+      console.log("Sending to add endpoint:", wordDataToSend);
+
+      // Use the authenticatedFetch helper to call your backend
+      const result = await authenticatedFetch('http://localhost:5000/word/add-word', {
+        method: 'POST',
+        body: JSON.stringify(wordDataToSend), // Send only the data the admin provided
+      });
+
+      console.log("Word saved via backend:", result);
+
+      // Reload from Firestore to reflect the word as saved by the backend (with calculated type/expValue)
+      const querySnapshot = await getDocs(collection(db, 'wordBank'));
+      const wordList = [];
+      querySnapshot.forEach((doc) => {
+        wordList.push({ id: doc.id, ...doc.data() });
+      });
+      setWords(wordList);
+
       setAddingWord(null);
-      alert("✅ New word added successfully!");
+      alert("✅ New word added successfully via backend!");
     } catch (error) {
-      console.error("Error adding word:", error);
-      alert("Failed to add word. Please try again.");
+      console.error("Error adding word via backend:", error);
+      alert("Failed to add word via backend. Please try again. Error: " + error.message);
     }
     setLoading(false);
   };
 
-  // Handle CSV Upload and Save to Firebase
+  // Handle CSV Upload and Save to Firebase via Backend
   const handleCSVUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -116,49 +203,109 @@ export default function LevelBasedLearningMode() {
     reader.onload = async (e) => {
       const text = e.target.result;
       const lines = text.split('\n');
-      
+
+      // Validate header row (optional but recommended)
+      const headerRow = lines[0].split(',').map(col => col.trim().toLowerCase());
+      const expectedHeaders = ['word', 'emoji', 'examplesentence', 'difficulty', 'phonicspattern'];
+      const missingHeaders = expectedHeaders.filter(header => !headerRow.includes(header));
+      if (missingHeaders.length > 0) {
+        alert(`❌ Missing required headers: ${missingHeaders.join(', ')}. Please use the template.`);
+        setLoading(false);
+        return;
+      }
+
+      // Map column indices by name
+      const colMap = {};
+      expectedHeaders.forEach(header => {
+        const index = headerRow.indexOf(header);
+        colMap[header] = index;
+      });
+
       const csvWords = [];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',');
-        if (values.length >= 7 && values[0]) { // Ensure all fields exist
-          const word = {
-            word: values[0],
-            difficulty: values[1],
-            type: values[2],
-            emoji: values[3],
-            exampleSentence: values[4],
-            phonicsPattern: values[5],
-            addedBy: values[6] || 'admin',
-            expValue: 10 // Default EXP value
-          };
-          csvWords.push(word);
+        if (values.length === 0 || !values[0]?.trim()) continue; // Skip empty rows
 
-          // 🔥 Save each word to Firestore in wordBank collection
-          try {
-            await setDoc(doc(db, 'wordBank', values[0]), word);
-          } catch (error) {
-            console.error(`❌ Failed to save ${values[0]} to Firestore:`, error);
-          }
+        // Extract values by header name, not position
+        const word = values[colMap['word']]?.trim() || '';
+        const emoji = values[colMap['emoji']]?.trim() || '📝';
+        const exampleSentence = values[colMap['examplesentence']]?.trim() || '';
+        let difficulty = values[colMap['difficulty']]?.trim()?.toLowerCase() || 'easy';
+        const phonicsPattern = values[colMap['phonicspattern']]?.trim() || 'CVC';
+
+        // Validate required fields
+        if (!word) {
+          console.warn(`⚠️ Skipping row ${i + 1}: Word is empty`);
+          continue;
+        }
+
+        // Validate difficulty
+        if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+          console.warn(`⚠️ Invalid difficulty "${difficulty}" for word "${word}". Defaulting to 'easy'.`);
+          difficulty = 'easy';
+        }
+
+        const wordData = {
+          word,
+          emoji,
+          exampleSentence,
+          difficulty,
+          phonicsPattern
+        };
+
+        csvWords.push(wordData);
+
+        // 🔥 Send each word to backend for automatic type/expValue calculation using the helper
+        try {
+          // This call will automatically get the token and add it to the headers
+          const result = await authenticatedFetch('http://localhost:5000/word/add-word', {
+            method: 'POST',
+            body: JSON.stringify(wordData) // authenticatedFetch adds Content-Type and Authorization
+          });
+          console.log(`✅ Successfully added ${wordData.word} via backend:`, result);
+        } catch (error) {
+          console.error(`❌ Failed to process ${wordData.word} via backend:`, error.message);
+          // Optionally, you could add the word to an error list to report later
+          // For now, we'll just log the error and continue with the next word.
         }
       }
 
-      // ✅ Update local state to show instantly
-      setWords(csvWords);
+      // ✅ Reload words from Firestore after ALL backend processes them
+      // This ensures the UI shows the most up-to-date list including the newly added words.
+      try {
+        console.log("Reloading words from Firestore after CSV upload...");
+        // Note: Admin profiles might need to be re-fetched if the CSV upload could introduce new 'addedBy' UIDs
+        // For now, we just reload words and rely on the existing adminProfiles state
+        const querySnapshot = await getDocs(collection(db, 'wordBank'));
+        const wordList = [];
+        querySnapshot.forEach((doc) => {
+          wordList.push({ id: doc.id, ...doc.data() });
+        });
+        setWords(wordList); // Update the local state
+        console.log("Word list reloaded successfully.");
+      } catch (err) {
+        console.error("Failed to reload words after upload:", err);
+        // Consider showing an alert or message to the user that the upload might have succeeded
+        // but the UI couldn't update.
+        alert("Upload may have completed, but failed to reload the word list. Please refresh the page manually.");
+      }
+
+
       setLoading(false);
-      alert(`✅ Successfully imported and saved ${csvWords.length} words to Firebase!`);
+      alert(`✅ Successfully processed ${csvWords.length} words via backend!`);
     };
     reader.readAsText(file);
   };
 
   // Generate and download CSV template
   const downloadTemplate = () => {
-    const header = "word,difficulty,type,emoji,exampleSentence,phonicsPattern,addedBy\n";
+    const header = "word,phonicsPattern,difficulty,emoji,exampleSentence\n";
     const templateRows = [
-      "cat,easy,CVC,🐱,The cat sat on the mat.,CVC,admin",
-      "dog,easy,CVC,🐕,The dog ran fast.,CVC,admin",
-      "sun,easy,CVC,☀️,The sun is bright.,CVC,admin",
-      "fish,medium,digraph,🐟,The fish swims in the sea.,sh,admin",
-      "cake,hard,silent_e,🎂,She ate a big cake.,silent_e,admin"
+      "cat,CVC,easy,🐱,The cat sat on the mat.",
+      "dog,CVC,easy,🐕,The dog ran fast.",
+      "sun,CVC,easy,☀️,The sun is bright.",
+      "fish,digraph,medium,🐟,The fish swims in the sea.",
+      "cake,silent_e,hard,🎂,She ate a big cake."
     ].join("\n");
 
     const csvContent = header + templateRows;
@@ -194,6 +341,30 @@ export default function LevelBasedLearningMode() {
   return (
     <div className="min-h-screen bg-[#FDFBF7] p-16 rounded-3xl overflow-hidden mt-14 shadow-sm">
       <div className="max-w-7xl mx-auto">
+        {/* Add the datalist for phonics patterns here */}
+        <datalist id="phonicsPatternList">
+          <option value="CVC" />
+          <option value="VC" />
+          <option value="CV" />
+          <option value="double_consonant" />
+          <option value="blends_fl" />
+          <option value="blends_st" />
+          <option value="digraph_sh" />
+          <option value="digraph_ch" />
+          <option value="digraph_th" />
+          <option value="silent_e" />
+          <option value="long_vowel_ai" />
+          <option value="vowel_team_oa" />
+          <option value="vowel_team_ee" />
+          <option value="r_controlled_ar" />
+          <option value="r_controlled_er" />
+          <option value="diphthong_oi" />
+          <option value="diphthong_ou" />
+          <option value="multisyllabic" />
+          <option value="compound" />
+          <option value="sight_word_irregular" />
+        </datalist>
+
         {/* Header */}
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -317,21 +488,22 @@ export default function LevelBasedLearningMode() {
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-xl font-bold text-gray-800">{word.word}</h3>
                         <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">
-                          {word.type}
+                          {word.type || 'N/A'}
                         </span>
                         <span className={`px-3 py-1 text-xs font-bold rounded-full ${
                           word.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
                           word.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
+                          word.difficulty === 'hard' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
                         }`}>
-                          {word.difficulty}
+                          {word.difficulty || 'N/A'}
                         </span>
                       </div>
                       
                       <div className="grid grid-cols-4 gap-6 text-sm">
                         <div>
                           <p className="text-gray-500 mb-1">Phonics Pattern</p>
-                          <p className="font-bold text-gray-800">{word.phonicsPattern}</p>
+                          <p className="font-bold text-gray-800">{word.phonicsPattern || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-gray-500 mb-1">EXP Value</p>
@@ -342,7 +514,8 @@ export default function LevelBasedLearningMode() {
                         </div>
                         <div>
                           <p className="text-gray-500 mb-1">Added By</p>
-                          <p className="font-bold text-gray-800">{word.addedBy}</p>
+                          {/* Display role from adminProfiles state, fallback to UID */}
+                          <p className="font-bold text-gray-800">{adminProfiles[word.addedBy] || word.addedBy}</p>
                         </div>
                         <div>
                           <p className="text-gray-500 mb-1">Example</p>
@@ -401,6 +574,7 @@ export default function LevelBasedLearningMode() {
                       value={editingWord.word}
                       onChange={(e) => setEditingWord({ ...editingWord, word: e.target.value })}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-800"
+                      readOnly // Consider making word field read-only during edit to prevent ID conflicts
                     />
                   </div>
                   <div>
@@ -414,27 +588,12 @@ export default function LevelBasedLearningMode() {
                   </div>
                 </div>
 
-                {/* Type & Difficulty */}
+                {/* Difficulty & Phonics Pattern — CRITICAL FIELDS */}
                 <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Type</label>
-                    <select
-                      value={editingWord.type}
-                      onChange={(e) => setEditingWord({ ...editingWord, type: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-800"
-                    >
-                      <option value="CVC">CVC</option>
-                      <option value="digraph">Digraph</option>
-                      <option value="blend">Blend</option>
-                      <option value="silent_e">Silent E</option>
-                      <option value="vowel_team">Vowel Team</option>
-                      <option value="sight_word">Sight Word</option>
-                    </select>
-                  </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Difficulty</label>
                     <select
-                      value={editingWord.difficulty}
+                      value={editingWord.difficulty || 'easy'}
                       onChange={(e) => setEditingWord({ ...editingWord, difficulty: e.target.value })}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-800"
                     >
@@ -443,26 +602,15 @@ export default function LevelBasedLearningMode() {
                       <option value="hard">Hard</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Phonics Pattern & EXP Value */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
+                  <div> {/* Phonics Pattern Input */}
                     <label className="block text-sm font-bold text-gray-700 mb-2">Phonics Pattern</label>
                     <input
                       type="text"
-                      value={editingWord.phonicsPattern}
+                      list="phonicsPatternList" // Links to the datalist defined above
+                      value={editingWord.phonicsPattern || ''}
                       onChange={(e) => setEditingWord({ ...editingWord, phonicsPattern: e.target.value })}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">EXP Value</label>
-                    <input
-                      type="number"
-                      value={editingWord.expValue}
-                      onChange={(e) => setEditingWord({ ...editingWord, expValue: parseInt(e.target.value) || 10 })}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-800"
+                      placeholder="Type or select..." // Optional placeholder
                     />
                   </div>
                 </div>
@@ -538,27 +686,12 @@ export default function LevelBasedLearningMode() {
                   </div>
                 </div>
 
-                {/* Type & Difficulty */}
+                {/* Difficulty & Phonics Pattern — CRITICAL FIELDS */}
                 <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Type</label>
-                    <select
-                      value={addingWord.type}
-                      onChange={(e) => setAddingWord({ ...addingWord, type: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent text-gray-800"
-                    >
-                      <option value="CVC">CVC</option>
-                      <option value="digraph">Digraph</option>
-                      <option value="blend">Blend</option>
-                      <option value="silent_e">Silent E</option>
-                      <option value="vowel_team">Vowel Team</option>
-                      <option value="sight_word">Sight Word</option>
-                    </select>
-                  </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Difficulty</label>
                     <select
-                      value={addingWord.difficulty}
+                      value={addingWord.difficulty || 'easy'}
                       onChange={(e) => setAddingWord({ ...addingWord, difficulty: e.target.value })}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent text-gray-800"
                     >
@@ -567,26 +700,15 @@ export default function LevelBasedLearningMode() {
                       <option value="hard">Hard</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Phonics Pattern & EXP Value */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
+                  <div> {/* Phonics Pattern Input */}
                     <label className="block text-sm font-bold text-gray-700 mb-2">Phonics Pattern</label>
                     <input
                       type="text"
-                      value={addingWord.phonicsPattern}
+                      list="phonicsPatternList" // Links to the datalist defined above
+                      value={addingWord.phonicsPattern || ''}
                       onChange={(e) => setAddingWord({ ...addingWord, phonicsPattern: e.target.value })}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent text-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">EXP Value</label>
-                    <input
-                      type="number"
-                      value={addingWord.expValue}
-                      onChange={(e) => setAddingWord({ ...addingWord, expValue: parseInt(e.target.value) || 10 })}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent text-gray-800"
+                      placeholder="Type or select..." // Optional placeholder
                     />
                   </div>
                 </div>

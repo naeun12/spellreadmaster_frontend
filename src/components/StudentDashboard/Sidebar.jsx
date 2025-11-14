@@ -74,7 +74,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
             {/* Monitor Student Progress */}
             <li>
               <Link
-                to="/StudentPage/#"
+                to="/StudentPage/monitor-student-progress"
                 className="relative flex flex-row items-center h-11 focus:outline-none hover:bg-[#FCC636] text-black hover:text-white border-l-4 border-transparent hover:border-[#FCC636] pr-6"
                 onClick={handleNavigation}
               >

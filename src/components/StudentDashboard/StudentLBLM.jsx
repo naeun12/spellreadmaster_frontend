@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Lock, CheckCircle, Zap } from 'lucide-react';
 import { auth, db } from '../../firebase'; // adjust path as needed - FIXED
 import { doc, getDoc } from 'firebase/firestore';
+import { authenticatedFetch } from '../../api';
 
 // Add custom animations
 const styles = `
@@ -247,122 +248,88 @@ export default function StudentLBLM() {
   // 🔧 Updated startQuiz to connect to AI backend
 const startQuiz = async (level) => {
   console.log('Starting quiz for level:', level.level);
-  
+
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("❌ Please log in first!");
-      return;
-    }
-    
-    const idToken = await user.getIdToken();
-    
-    // ✅ CORRECT ENDPOINT NAME: /get-quiz/:level
-    const response = await fetch(`http://localhost:5000/get-quiz/${level.level}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${idToken}`, // ✅ Required for authentication
-        'Content-Type': 'application/json'
-      }
+    // ✅ CORRECT ENDPOINT NAME: /quiz/get-quiz/:level
+    const quizData = await authenticatedFetch(`http://localhost:5000/quiz/get-quiz/${level.level}`, {
+      method: 'GET'
     });
 
-    if (response.ok) {
-      const quizData = await response.json();
-      console.log('Loaded quiz for level:', level.level, quizData);
-      alert(`Starting ${level.theme} quiz! Questions loaded from AI backend.`);
-    } else {
-      // ✅ CORRECT FALLBACK: /generate-single-quiz (POST)
-      const generateResponse = await fetch('http://localhost:5000/generate-single-quiz', {
-        method: 'POST', // ✅ Must be POST
-        headers: {
-          'Authorization': `Bearer ${idToken}`, // ✅ Required for authentication
-          'Content-Type': 'application/json'
-        },
+    // ✅ NEW: Check if the level is "mastered"
+    if (quizData.status === 'mastered') {
+      alert(`🎉 ${quizData.message}\nYou've earned +${quizData.expReward} EXP!`);
+      // Immediately complete the level (awards EXP, unlocks next level)
+      completeLevel({
+        ...level,
+        expReward: quizData.expReward
+      });
+      return;
+    }
+
+    console.log('Loaded quiz for level:', level.level, quizData);
+    alert(`Starting quiz! Questions loaded from AI backend.`);
+  } catch (error) {
+    console.error("💥 Error starting quiz:", error);
+
+    try {
+      // ✅ CORRECT FALLBACK: /quiz/generate-single-quiz (POST)
+      await authenticatedFetch('http://localhost:5000/quiz/generate-single-quiz', {
+        method: 'POST',
         body: JSON.stringify({
           level: level.level,
-          grade: 1,
-          weakAreas: studentData.weakAreas,
-          skillLevel: studentData.skillLevel
+          weakAreas: studentData.weakAreas, // Nested object: { "type": ["pattern1", "pattern2"] }
+          masteredPhonicsLevels: studentData.masteredPhonicsLevels || [] // Send mastered levels
+          // ❌ Removed: grade, skillLevel
         })
       });
 
-      if (generateResponse.ok) {
-        console.log('Generated new quiz for level:', level.level);
-        // Try to get the quiz again after generation
-        const retryResponse = await fetch(`http://localhost:5000/get-quiz/${level.level}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (retryResponse.ok) {
-          const quizData = await retryResponse.json();
-          console.log('Loaded generated quiz for level:', level.level, quizData);
-          alert(`Starting ${level.theme} quiz! AI generated new questions.`);
-        }
-      } else {
-        alert(`Failed to generate quiz for level ${level.level}. Using demo mode.`);
-      }
+      console.log('Generated new quiz for level:', level.level);
+      // Try to get the quiz again after generation
+      const retryResponse = await authenticatedFetch(`http://localhost:5000/quiz/get-quiz/${level.level}`, {
+        method: 'GET'
+      });
+
+      console.log('Loaded generated quiz for level:', level.level, retryResponse);
+      alert(`Starting quiz! AI generated new questions.`);
+    } catch (genError) {
+      console.error("💥 Error generating quiz:", genError);
+      alert(`Failed to generate quiz for level ${level.level}. Using demo mode.`);
     }
-  } catch (error) {
-    console.error("💥 Error starting quiz:", error);
-    alert("Failed to load quiz. Please try again.");
   }
 };
 
-  // 🔧 Updated completeLevel to connect to backend
-  const completeLevel = async (level) => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
+// 🔧 Updated completeLevel to connect to backend
+const completeLevel = async (level) => {
+  try {
+    // ✅ Use authenticatedFetch
+    const result = await authenticatedFetch(`http://localhost:5000/quiz/submit-quiz/${level.level}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        userAnswers: [], // In demo mode, no actual answers
+        timestamp: new Date().toISOString()
+      })
+    });
 
-      const idToken = await user.getIdToken();
-      
-      // Submit quiz results to backend (even if it's just a demo completion)
-      const response = await fetch(`http://localhost:5000/submit-quiz/${level.level}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userAnswers: [], // In demo mode, no actual answers
-          timestamp: new Date().toISOString()
-        })
-      });
+    console.log('Quiz submitted successfully:', result);
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Quiz submitted successfully:', result);
-        
-        // Update local state
-        setStudentData(prev => ({
-          ...prev,
-          totalExp: prev.totalExp + level.expReward,
-          completedLevels: [...new Set([...prev.completedLevels, level.level])]
-        }));
-      } else {
-        // If backend call fails, still update local state for demo
-        setStudentData(prev => ({
-          ...prev,
-          totalExp: prev.totalExp + level.expReward,
-          completedLevels: [...new Set([...prev.completedLevels, level.level])]
-        }));
-      }
-    } catch (error) {
-      console.error("💥 Error completing level:", error);
-      // Still update local state
-      setStudentData(prev => ({
-        ...prev,
-        totalExp: prev.totalExp + level.expReward,
-        completedLevels: [...new Set([...prev.completedLevels, level.level])]
-      }));
-    }
+    // Update local state
+    setStudentData(prev => ({
+      ...prev,
+      totalExp: prev.totalExp + level.expReward,
+      completedLevels: [...new Set([...prev.completedLevels, level.level])]
+    }));
+  } catch (error) {
+    console.error("💥 Error completing level:", error);
+    // Still update local state
+    setStudentData(prev => ({
+      ...prev,
+      totalExp: prev.totalExp + level.expReward,
+      completedLevels: [...new Set([...prev.completedLevels, level.level])]
+    }));
+  }
 
-    setSelectedLevel(null);
-  };
+  setSelectedLevel(null);
+};
 
   // Helper functions for dynamic level generation
   const calculateExpRequired = (levelNum) => {
