@@ -25,6 +25,7 @@ import StudentPreTest from './pages/StudentPreTest';
 import StudentLBLMPage from './pages/StudentLBLMPage';
 import StudentTLMPage from './pages/StudentTLMPage';
 import StudentSMPage from './pages/StudentSMPage';
+import StudentProfile from './components/StudentDashboard/StudentProfile';
 import StudentLBLM from './components/StudentDashboard/StudentLBLM';
 
 // Layouts
@@ -260,6 +261,16 @@ const App = () => {
         element={
           <ProtectedRoute allowedRoles={['student']}>
               <StudentSMPage />
+          </ProtectedRoute>
+        }
+      /> 
+
+            {/* Protected Student Page - Profile */}
+      <Route
+        path="/StudentPage/story-profile"
+        element={
+          <ProtectedRoute allowedRoles={['student']}>
+              <StudentProfile />
           </ProtectedRoute>
         }
       /> 

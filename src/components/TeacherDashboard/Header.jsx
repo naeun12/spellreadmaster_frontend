@@ -64,22 +64,8 @@ const Header = () => {
 
       {/* Right Section */}
       <div className="flex-1 flex justify-between items-center h-14 px-4">
-        {/* Search Bar */}
-        <div className="bg-white rounded flex items-center w-full sm:w-96 lg:w-1/2 xl:w-2/3 mr-4 p-2 shadow-sm border border-gray-200">
-          <button className="outline-none focus:outline-none">
-            <svg className="w-5 text-gray-600 h-5 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-          <input
-            type="search"
-            placeholder="Search"
-            className="w-full pl-3 text-sm text-black outline-none focus:outline-none bg-transparent"
-          />
-        </div>
-
         {/* Logout */}
-        <ul className="flex items-center space-x-4">
+        <ul className="flex items-center space-x-4 ml-auto">
           <li>
             <div className="block w-px h-6 mx-3 bg-white"></div>
           </li>

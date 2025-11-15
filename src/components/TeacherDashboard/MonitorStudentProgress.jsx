@@ -198,21 +198,21 @@ export default function MonitorStudentProgress() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-          <p className="text-white text-xl">Loading class progress...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-800 text-xl">Loading class progress...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 p-6">
+    <div className="min-h-screen text-black p-16 bg-[#FDFBF7] rounded-3xl overflow-hidden mt-14 shadow-sm">
       {/* Back Button */}
       <button
         onClick={() => window.location.href = '/TeacherPage'}
-        className="mb-6 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-full px-6 py-3 transition-all backdrop-blur-sm"
+        className="mb-6 flex items-center gap-2 bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-md px-6 py-3 transition-all shadow-md"
       >
         <ArrowLeft className="w-5 h-5" />
         Back to Dashboard
@@ -220,100 +220,103 @@ export default function MonitorStudentProgress() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 drop-shadow-lg">
-            📊 Class Progress Monitor
-          </h1>
-          <p className="text-purple-200">Track your students performance and identify areas for improvement</p>
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Class Progress Monitor</h1>
+          </div>
+          <p className="text-gray-600">Track your students performance and identify areas for improvement</p>
         </div>
 
         {/* Class Overview */}
         <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-blue-900/50 to-indigo-900/50 backdrop-blur-md rounded-xl border border-blue-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-3 mb-3">
-              <Users className="w-8 h-8 text-blue-400" />
+              <Users className="w-8 h-8 text-blue-600" />
               <div>
-                <p className="text-blue-200 text-sm">Total Students</p>
-                <p className="text-4xl font-bold text-white">{classData.totalStudents}</p>
+                <p className="text-gray-600 text-sm">Total Students</p>
+                <p className="text-4xl font-bold text-gray-900">{classData.totalStudents}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-900/50 to-emerald-900/50 backdrop-blur-md rounded-xl border border-green-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-3 mb-3">
-              <TrendingUp className="w-8 h-8 text-green-400" />
+              <TrendingUp className="w-8 h-8 text-green-600" />
               <div>
-                <p className="text-green-200 text-sm">Students Improved</p>
-                <p className="text-4xl font-bold text-white">{classData.studentsImproved}</p>
+                <p className="text-gray-600 text-sm">Students Improved</p>
+                <p className="text-4xl font-bold text-gray-900">{classData.studentsImproved}</p>
               </div>
             </div>
-            <p className="text-green-200 text-xs">+5% or more this week</p>
+            <p className="text-gray-500 text-xs">+5% or more this week</p>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-900/50 to-red-900/50 backdrop-blur-md rounded-xl border border-orange-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-3 mb-3">
-              <TrendingDown className="w-8 h-8 text-orange-400" />
+              <TrendingDown className="w-8 h-8 text-orange-600" />
               <div>
-                <p className="text-orange-200 text-sm">Falling Behind</p>
-                <p className="text-4xl font-bold text-white">{classData.studentsFallingBehind}</p>
+                <p className="text-gray-600 text-sm">Falling Behind</p>
+                <p className="text-4xl font-bold text-gray-900">{classData.studentsFallingBehind}</p>
               </div>
             </div>
-            <p className="text-orange-200 text-xs">-5% or more this week</p>
+            <p className="text-gray-500 text-xs">-5% or more this week</p>
           </div>
         </div>
 
         {/* Class Performance Reports */}
         <div className="grid md:grid-cols-2 gap-6">
           {/* Score Statistics */}
-          <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-md rounded-xl border border-purple-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-6 h-6 text-purple-400" />
-              <h3 className="text-xl font-bold text-white">Class Performance</h3>
+              <BarChart3 className="w-6 h-6 text-purple-600" />
+              <h3 className="text-xl font-bold text-gray-900">Class Performance</h3>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 rounded-lg p-4 text-center">
-                <Award className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-yellow-400">{classData.classAverageScore}%</p>
-                <p className="text-sm text-purple-200">Class Average</p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                <Award className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-yellow-600">{classData.classAverageScore}%</p>
+                <p className="text-sm text-gray-600">Class Average</p>
               </div>
 
-              <div className="bg-white/10 rounded-lg p-4 text-center">
-                <Target className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-blue-400">{classData.medianScore}%</p>
-                <p className="text-sm text-purple-200">Median Score</p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                <Target className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-blue-600">{classData.medianScore}%</p>
+                <p className="text-sm text-gray-600">Median Score</p>
               </div>
 
-              <div className="bg-white/10 rounded-lg p-4 text-center">
-                <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-green-400">{classData.highestScore}%</p>
-                <p className="text-sm text-purple-200">Highest Score</p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-green-600">{classData.highestScore}%</p>
+                <p className="text-sm text-gray-600">Highest Score</p>
               </div>
 
-              <div className="bg-white/10 rounded-lg p-4 text-center">
-                <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-red-400">{classData.lowestScore}%</p>
-                <p className="text-sm text-purple-200">Lowest Score</p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-red-600">{classData.lowestScore}%</p>
+                <p className="text-sm text-gray-600">Lowest Score</p>
               </div>
             </div>
           </div>
 
           {/* Difficulty Areas */}
-          <div className="bg-gradient-to-br from-orange-900/50 to-red-900/50 backdrop-blur-md rounded-xl border border-orange-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="w-6 h-6 text-orange-400" />
-              <h3 className="text-xl font-bold text-white">Class Difficulty Areas</h3>
+              <AlertCircle className="w-6 h-6 text-orange-600" />
+              <h3 className="text-xl font-bold text-gray-900">Class Difficulty Areas</h3>
             </div>
 
             {classData.difficultyAreas.length > 0 ? (
               <div className="space-y-3">
                 {classData.difficultyAreas.map((area, i) => (
-                  <div key={i} className="bg-white/10 rounded-lg p-3">
+                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-white font-medium">{area.area}</span>
-                      <span className="text-orange-400 font-bold text-lg">{area.count}</span>
+                      <span className="text-gray-900 font-medium">{area.area}</span>
+                      <span className="text-orange-600 font-bold text-lg">{area.count}</span>
                     </div>
-                    <div className="w-full bg-white/20 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all"
                         style={{ 
@@ -326,9 +329,9 @@ export default function MonitorStudentProgress() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-2" />
-                <p className="text-white font-bold">No difficulty areas identified!</p>
-                <p className="text-sm text-gray-300">Class is performing well</p>
+                <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-2" />
+                <p className="text-gray-900 font-bold">No difficulty areas identified!</p>
+                <p className="text-sm text-gray-600">Class is performing well</p>
               </div>
             )}
           </div>
@@ -337,21 +340,21 @@ export default function MonitorStudentProgress() {
         {/* Progress Over Time Charts */}
         <div className="space-y-6">
           {/* Weekly Improvement Graph */}
-          <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 backdrop-blur-md rounded-xl border border-cyan-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-6 h-6 text-cyan-400" />
-              <h3 className="text-xl font-bold text-white">Weekly Progress</h3>
+              <Calendar className="w-6 h-6 text-cyan-600" />
+              <h3 className="text-xl font-bold text-gray-900">Weekly Progress</h3>
             </div>
 
             {weeklyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="day" stroke="#fff" />
-                  <YAxis stroke="#fff" domain={[0, 100]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="day" stroke="#374151" />
+                  <YAxis stroke="#374151" domain={[0, 100]} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}
-                    labelStyle={{ color: '#fff' }}
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
+                    labelStyle={{ color: '#111827' }}
                   />
                   <Legend />
                   <Bar dataKey="avgScore" fill="#22d3ee" name="Average Score %" />
@@ -359,26 +362,26 @@ export default function MonitorStudentProgress() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-center py-12 text-white">No weekly data available</div>
+              <div className="text-center py-12 text-gray-600">No weekly data available</div>
             )}
           </div>
 
           {/* Quiz Score Trendline */}
-          <div className="bg-gradient-to-br from-pink-900/50 to-purple-900/50 backdrop-blur-md rounded-xl border border-pink-500/30 p-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-6 h-6 text-pink-400" />
-              <h3 className="text-xl font-bold text-white">Score Trend (Last 30 Days)</h3>
+              <TrendingUp className="w-6 h-6 text-pink-600" />
+              <h3 className="text-xl font-bold text-gray-900">Score Trend (Last 30 Days)</h3>
             </div>
 
             {trendData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="date" stroke="#fff" />
-                  <YAxis stroke="#fff" domain={[0, 100]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="date" stroke="#374151" />
+                  <YAxis stroke="#374151" domain={[0, 100]} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}
-                    labelStyle={{ color: '#fff' }}
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
+                    labelStyle={{ color: '#111827' }}
                   />
                   <Legend />
                   <Line 
@@ -392,7 +395,7 @@ export default function MonitorStudentProgress() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-center py-12 text-white">No trend data available</div>
+              <div className="text-center py-12 text-gray-600">No trend data available</div>
             )}
           </div>
         </div>

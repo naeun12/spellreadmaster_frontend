@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, CheckCircle, Zap } from 'lucide-react';
 import { auth, db } from '../../firebase'; // adjust path as needed - FIXED
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore'; // Import updateDoc and serverTimestamp
 import { authenticatedFetch } from '../../api';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate if you need it elsewhere, though we won't use it for quiz navigation in this version
 
 // Add custom animations
 const styles = `
@@ -78,6 +79,7 @@ const styles = `
 
 export default function StudentLBLM() {
   const containerRef = useRef(null);
+  const navigate = useNavigate(); // If needed elsewhere
   //const [isAnimating, setIsAnimating] = useState(false);
   
   // Student progress state - now loaded from Firestore
@@ -91,6 +93,14 @@ export default function StudentLBLM() {
   });
 
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- NEW STATES FOR QUIZ MODAL ---
+  const [selectedLevel, setSelectedLevel] = useState(null);
+  const [currentQuiz, setCurrentQuiz] = useState(null); // Stores quiz data fetched from backend
+  const [userAnswers, setUserAnswers] = useState({}); // Stores user's answers { questionIndex: 'answer' }
+  const [isSubmitting, setIsSubmitting] = useState(false); // Tracks submission state
+  const [quizFeedback, setQuizFeedback] = useState(null); // Stores feedback after submission
+  const [quizError, setQuizError] = useState(null); // Stores errors related to quiz fetching/submission
 
   const verticalOffset = -100;
 
@@ -106,7 +116,6 @@ export default function StudentLBLM() {
   ]);
 
   const [levels, setLevels] = useState([]);
-  const [selectedLevel, setSelectedLevel] = useState(null);
   const levelSpacing = 250;
 
   // Load student data from Firestore
@@ -245,91 +254,157 @@ export default function StudentLBLM() {
     setSelectedLevel(level);
   };
 
-  // 🔧 Updated startQuiz to connect to AI backend
+  // 🔧 Updated startQuiz to connect to AI backend and set quiz data for modal
 const startQuiz = async (level) => {
-  console.log('Starting quiz for level:', level.level);
-
-  try {
-    // ✅ CORRECT ENDPOINT NAME: /quiz/get-quiz/:level
-    const quizData = await authenticatedFetch(`http://localhost:5000/quiz/get-quiz/${level.level}`, {
-      method: 'GET'
-    });
-
-    // ✅ NEW: Check if the level is "mastered"
-    if (quizData.status === 'mastered') {
-      alert(`🎉 ${quizData.message}\nYou've earned +${quizData.expReward} EXP!`);
-      // Immediately complete the level (awards EXP, unlocks next level)
-      completeLevel({
-        ...level,
-        expReward: quizData.expReward
-      });
-      return;
-    }
-
-    console.log('Loaded quiz for level:', level.level, quizData);
-    alert(`Starting quiz! Questions loaded from AI backend.`);
-  } catch (error) {
-    console.error("💥 Error starting quiz:", error);
+    console.log('Starting quiz for level:', level.level);
+    setQuizError(null); 
+    setQuizFeedback(null); 
+    const levelNum = level.level;
+    const QUIZ_ENDPOINT = `http://localhost:5000/quiz/get-quiz/${levelNum}`;
 
     try {
-      // ✅ CORRECT FALLBACK: /quiz/generate-single-quiz (POST)
-      await authenticatedFetch('http://localhost:5000/quiz/generate-single-quiz', {
+        console.log(`[startQuiz] Attempting to retrieve quiz from: ${QUIZ_ENDPOINT}`);
+        
+        // 1. ATTEMPT TO GET QUIZ
+        const quizData = await authenticatedFetch(QUIZ_ENDPOINT, { method: 'GET' });
+
+        // Check for "mastered" status 
+        if (quizData.status === 'mastered') {
+            console.log(`[startQuiz] 🎉 Level ${levelNum} is mastered.`);
+            completeLevel({ ...level, expReward: quizData.expReward });
+            return;
+        }
+        
+        // Check for successful data retrieval
+        if (quizData && quizData.questions && quizData.questions.length > 0) {
+            console.log(`[startQuiz] ✅ Quiz successfully retrieved with ${quizData.questions.length} questions.`);
+            setCurrentQuiz(quizData);
+            setUserAnswers({});
+            return;
+        }
+        
+        // If the data was retrieved but was empty or malformed
+        throw new Error(`Retrieved data for level ${levelNum} was empty or invalid.`);
+
+    } catch (error) {
+        // 2. ONLY LOG THE FAILURE (No Fallback/Generation Attempt)
+        console.error("💥 Failed to retrieve quiz data. No generation executed.", error.message);
+        setQuizError(`Quiz for level ${levelNum} is missing or could not be loaded.`);
+        alert(`Failed to load quiz for level ${levelNum}. Data may be missing or the server is down.`);
+    }
+};
+  // Handle user answer input
+  const handleAnswerChange = (questionIndex, answer) => {
+    setUserAnswers(prev => ({
+      ...prev,
+      [questionIndex]: answer
+    }));
+  };
+
+  // Submit the quiz
+  const submitQuiz = async () => {
+    if (!currentQuiz || isSubmitting) return;
+    setIsSubmitting(true);
+    setQuizError(null); // Reset error state on submit
+
+    try {
+      // Prepare submission data
+      const submissionData = {
+        userAnswers: currentQuiz.questions.map((q, idx) => ({
+          question: q.question,
+          userAnswer: userAnswers[idx] || '',
+          correct: (userAnswers[idx] || '').toLowerCase().trim() === q.answer.toLowerCase().trim(),
+          word: q.word, // Include word if backend expects it
+          expValue: q.expValue // Include expValue if backend expects it
+        })),
+        timestamp: new Date().toISOString()
+      };
+
+      // Submit results to backend
+      const result = await authenticatedFetch(`http://localhost:5000/quiz/submit-quiz/${currentQuiz.level}`, {
+        method: 'POST',
+        body: JSON.stringify(submissionData)
+      });
+
+      console.log('Quiz submitted successfully:', result);
+
+      // Calculate EXP earned and correct answers
+      let earnedExp = 0;
+      let correctCount = 0;
+      submissionData.userAnswers.forEach(ua => {
+        if (ua.correct) {
+          earnedExp += ua.expValue || 10; // Default to 10 if expValue missing
+          correctCount++;
+        }
+      });
+
+      // Update local student data state
+      setStudentData(prev => ({
+        ...prev,
+        totalExp: prev.totalExp + earnedExp,
+        completedLevels: [...new Set([...prev.completedLevels, currentQuiz.level])]
+      }));
+
+      // Update Firestore (optional, but good for consistency)
+      const user = auth.currentUser;
+      if (user) {
+        await updateDoc(doc(db, 'students', user.uid), {
+          totalExp: db.FieldValue.increment(earnedExp),
+          [`completedLevels.${currentQuiz.level - 1}`]: true // This might need adjustment based on how you track levels
+          // You might want to add a specific entry in the activity log too
+        });
+      }
+
+      // Set feedback
+      setQuizFeedback({
+        earnedExp: earnedExp,
+        correctCount: correctCount,
+        totalCount: currentQuiz.questions.length
+      });
+
+      // Optionally, close the quiz modal after a delay or on button click
+      // setTimeout(() => { setCurrentQuiz(null); setSelectedLevel(null); }, 3000); // Example: auto-close after 3 seconds
+
+    } catch (err) {
+      console.error("💥 Error submitting quiz:", err);
+      setQuizError(`Failed to submit quiz: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 🔧 Updated completeLevel to connect to backend (if needed for demo button)
+  const completeLevel = async (level) => {
+    try {
+      // ✅ Use authenticatedFetch
+      const result = await authenticatedFetch(`http://localhost:5000/quiz/submit-quiz/${level.level}`, {
         method: 'POST',
         body: JSON.stringify({
-          level: level.level,
-          weakAreas: studentData.weakAreas, // Nested object: { "type": ["pattern1", "pattern2"] }
-          masteredPhonicsLevels: studentData.masteredPhonicsLevels || [] // Send mastered levels
-          // ❌ Removed: grade, skillLevel
+          userAnswers: [], // In demo mode, no actual answers
+          timestamp: new Date().toISOString()
         })
       });
 
-      console.log('Generated new quiz for level:', level.level);
-      // Try to get the quiz again after generation
-      const retryResponse = await authenticatedFetch(`http://localhost:5000/quiz/get-quiz/${level.level}`, {
-        method: 'GET'
-      });
+      console.log('Quiz submitted successfully (demo):', result);
 
-      console.log('Loaded generated quiz for level:', level.level, retryResponse);
-      alert(`Starting quiz! AI generated new questions.`);
-    } catch (genError) {
-      console.error("💥 Error generating quiz:", genError);
-      alert(`Failed to generate quiz for level ${level.level}. Using demo mode.`);
+      // Update local state
+      setStudentData(prev => ({
+        ...prev,
+        totalExp: prev.totalExp + level.expReward,
+        completedLevels: [...new Set([...prev.completedLevels, level.level])]
+      }));
+    } catch (error) {
+      console.error("💥 Error completing level (demo):", error);
+      // Still update local state
+      setStudentData(prev => ({
+        ...prev,
+        totalExp: prev.totalExp + level.expReward,
+        completedLevels: [...new Set([...prev.completedLevels, level.level])]
+      }));
     }
-  }
-};
 
-// 🔧 Updated completeLevel to connect to backend
-const completeLevel = async (level) => {
-  try {
-    // ✅ Use authenticatedFetch
-    const result = await authenticatedFetch(`http://localhost:5000/quiz/submit-quiz/${level.level}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        userAnswers: [], // In demo mode, no actual answers
-        timestamp: new Date().toISOString()
-      })
-    });
-
-    console.log('Quiz submitted successfully:', result);
-
-    // Update local state
-    setStudentData(prev => ({
-      ...prev,
-      totalExp: prev.totalExp + level.expReward,
-      completedLevels: [...new Set([...prev.completedLevels, level.level])]
-    }));
-  } catch (error) {
-    console.error("💥 Error completing level:", error);
-    // Still update local state
-    setStudentData(prev => ({
-      ...prev,
-      totalExp: prev.totalExp + level.expReward,
-      completedLevels: [...new Set([...prev.completedLevels, level.level])]
-    }));
-  }
-
-  setSelectedLevel(null);
-};
+    setSelectedLevel(null);
+  };
 
   // Helper functions for dynamic level generation
   const calculateExpRequired = (levelNum) => {
@@ -396,10 +471,10 @@ const completeLevel = async (level) => {
       `}</style>
       
       {/* Back to Dashboard Button */}
-      <div className={`absolute top-4 left-4 ${selectedLevel ? 'backdrop-blur-md' : ''} z-40`}>
+      <div className={`absolute top-4 left-4 ${selectedLevel || currentQuiz ? 'backdrop-blur-md' : ''} z-40`}>
         <button
-          onClick={() => window.location.href = '/StudentPage'}
-          className={`bg-yellow-400 ${selectedLevel ? 'bg-opacity-10 hover:bg-opacity-15' : 'bg-opacity-20 hover:bg-opacity-30'} text-white rounded-full p-3 transition-colors shadow-lg`}
+          onClick={() => navigate('/StudentPage')} // Or window.location.href = '/StudentPage'
+          className={`bg-yellow-400 ${selectedLevel || currentQuiz ? 'bg-opacity-10 hover:bg-opacity-15' : 'bg-opacity-20 hover:bg-opacity-30'} text-white rounded-full p-3 transition-colors shadow-lg`}
           title="Back to Dashboard"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -780,7 +855,7 @@ const completeLevel = async (level) => {
       </div>
 
       {/* Level details panel */}
-      {selectedLevel && (
+      {selectedLevel && !currentQuiz && ( // Show level details only if no quiz is active
         <>
           <div 
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
@@ -861,6 +936,97 @@ const completeLevel = async (level) => {
               >
                 (Demo: Complete Level)
               </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Quiz Modal */}
+      {currentQuiz && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
+          <div
+            className="fixed bg-gradient-to-br from-indigo-900 to-purple-950 rounded-3xl shadow-2xl border-4 border-yellow-400/50 p-8 w-11/12 max-w-4xl z-50 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => { setCurrentQuiz(null); setSelectedLevel(null); setQuizFeedback(null); setQuizError(null); setUserAnswers({}); }} // Close quiz
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-indigo-800 hover:bg-indigo-700 transition-colors text-xl font-bold text-white border-2 border-purple-400"
+            >
+              ✕
+            </button>
+
+            <h2 className="text-2xl font-bold text-white mb-4">Quiz: Level {currentQuiz.level}</h2>
+
+            {/* Quiz Error Message */}
+            {quizError && (
+              <div className="bg-red-600/30 border-2 border-red-400 rounded-2xl p-4 mb-4 text-center backdrop-blur-sm">
+                <p className="text-red-200 font-bold">Error: {quizError}</p>
+              </div>
+            )}
+
+            {/* Quiz Feedback Message (after submission) */}
+            {quizFeedback && (
+              <div className="bg-green-600/30 border-2 border-green-400 rounded-2xl p-4 mb-4 text-center backdrop-blur-sm">
+                <p className="text-green-200 font-bold text-lg">Quiz Complete!</p>
+                <p className="text-green-100">You earned <span className="font-bold">{quizFeedback.earnedExp}</span> EXP!</p>
+                <p className="text-green-100">You got <span className="font-bold">{quizFeedback.correctCount}</span> out of <span className="font-bold">{quizFeedback.totalCount}</span> correct.</p>
+              </div>
+            )}
+
+            {/* Render Questions */}
+            {!quizFeedback && currentQuiz.questions && currentQuiz.questions.length > 0 && (
+              <div className="space-y-6">
+                {currentQuiz.questions.map((q, index) => (
+                  <div key={index} className="bg-indigo-800/50 p-4 rounded-xl border border-purple-500/30">
+                    <p className="text-lg text-white mb-2 font-semibold">Question {index + 1}: {q.question}</p>
+                    <input
+                      type="text"
+                      value={userAnswers[index] || ''}
+                      onChange={(e) => handleAnswerChange(index, e.target.value)}
+                      className="w-full p-3 rounded-lg border border-purple-500 bg-indigo-900 text-white text-lg"
+                      placeholder="Type your answer..."
+                      disabled={isSubmitting || !!quizFeedback} // Disable during submission or after feedback
+                    />
+                    {q.hint && !quizFeedback && ( // Show hint only if not submitted yet
+                      <p className="text-sm text-purple-300 mt-2 italic">Hint: {q.hint}</p>
+                    )}
+                    {/* Optional: Show if answer was correct after submission */}
+                    {quizFeedback && (
+                      <div className={`mt-2 text-sm ${userAnswers[index]?.toLowerCase().trim() === q.answer.toLowerCase().trim() ? 'text-green-300' : 'text-red-300'}`}>
+                        {userAnswers[index]?.toLowerCase().trim() === q.answer.toLowerCase().trim() ? '✓ Correct!' : `✗ Incorrect. The answer is: ${q.answer}`}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Submit Button (only show if not submitted yet) */}
+            {!quizFeedback && currentQuiz.questions && currentQuiz.questions.length > 0 && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={submitQuiz}
+                  disabled={isSubmitting || Object.keys(userAnswers).length < currentQuiz.questions.length || quizFeedback} // Disable if submitting, not all answered, or already submitted
+                  className={`py-3 px-8 font-bold rounded-full shadow-lg transition-all transform hover:scale-105 ${
+                    isSubmitting || Object.keys(userAnswers).length < currentQuiz.questions.length || quizFeedback
+                      ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
+                  }`}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Answers'}
+                </button>
+              </div>
+            )}
+
+            {/* Close Button (after submission) */}
+            {quizFeedback && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => { setCurrentQuiz(null); setSelectedLevel(null); setQuizFeedback(null); setQuizError(null); setUserAnswers({}); }}
+                  className="py-3 px-8 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+                >
+                  Close Quiz
+                </button>
+              </div>
             )}
           </div>
         </>

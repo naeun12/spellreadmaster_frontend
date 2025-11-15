@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Award, Target, AlertCircle, Book, Zap, BarChart3, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
+import { TrendingUp, Award, Target, AlertCircle, Book, Zap, BarChart3, CheckCircle, XCircle, ArrowLeft, Home } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { doc, getDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
@@ -140,10 +140,10 @@ export default function MonitorStudentProgress() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-          <p className="text-white text-xl">Loading your progress...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-800 text-xl">Loading your progress...</p>
         </div>
       </div>
     );
@@ -156,129 +156,132 @@ export default function MonitorStudentProgress() {
   const progressPercent = getProgressPercent();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 p-6">
+    <div className="min-h-screen text-black p-16 bg-[#FDFBF7] rounded-3xl overflow-hidden mt-14 shadow-sm">
       {/* Back Button */}
       <button
         onClick={() => window.location.href = '/StudentPage'}
-        className="mb-6 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-full px-6 py-3 transition-all backdrop-blur-sm"
+        className="mb-6 flex items-center gap-2 bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-md px-6 py-3 transition-all shadow-md"
       >
         <ArrowLeft className="w-5 h-5" />
         Back to Dashboard
       </button>
 
-      <div className="max-w-6xl mx-auto space-y-4">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center mb-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 drop-shadow-lg">
-            📊 My Progress
-          </h1>
-          <p className="text-purple-200">Track your spelling journey!</p>
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">My Progress</h1>
+          </div>
+          <p className="text-gray-600">Track your spelling journey!</p>
         </div>
 
         {/* Compact Stats Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Level */}
-          <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-md rounded-xl border border-purple-500/30 p-4">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-4 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-5 h-5 text-yellow-400" />
-              <p className="text-purple-200 text-xs">Level</p>
+              <Zap className="w-5 h-5 text-purple-600" />
+              <p className="text-gray-600 text-sm">Level</p>
             </div>
-            <p className="text-3xl font-bold text-yellow-400">{currentLevel} ⭐</p>
+            <p className="text-3xl font-bold text-purple-600">{currentLevel} ⭐</p>
           </div>
 
           {/* Total EXP */}
-          <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 backdrop-blur-md rounded-xl border border-cyan-500/30 p-4">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-4 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-5 h-5 text-cyan-400" />
-              <p className="text-cyan-200 text-xs">Total EXP</p>
+              <Zap className="w-5 h-5 text-cyan-600" />
+              <p className="text-gray-600 text-sm">Total EXP</p>
             </div>
-            <p className="text-3xl font-bold text-cyan-400">{totalExp}</p>
+            <p className="text-3xl font-bold text-cyan-600">{totalExp}</p>
           </div>
 
           {/* To Next Level */}
-          <div className="bg-gradient-to-br from-green-900/50 to-emerald-900/50 backdrop-blur-md rounded-xl border border-green-500/30 p-4">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-4 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5 text-green-400" />
-              <p className="text-green-200 text-xs">To Next</p>
+              <Target className="w-5 h-5 text-green-600" />
+              <p className="text-gray-600 text-sm">To Next</p>
             </div>
-            <p className="text-3xl font-bold text-green-400">{expToNext}</p>
+            <p className="text-3xl font-bold text-green-600">{expToNext}</p>
           </div>
 
           {/* Average */}
-          <div className="bg-gradient-to-br from-blue-900/50 to-indigo-900/50 backdrop-blur-md rounded-xl border border-blue-500/30 p-4">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-4 hover:shadow-md transition-all">
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-5 h-5 text-blue-400" />
-              <p className="text-blue-200 text-xs">Avg Score</p>
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+              <p className="text-gray-600 text-sm">Avg Score</p>
             </div>
-            <p className="text-3xl font-bold text-blue-400">{stats.averageScore}%</p>
+            <p className="text-3xl font-bold text-blue-600">{stats.averageScore}%</p>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-md rounded-xl border border-purple-500/30 p-4">
-          <div className="flex justify-between text-xs text-purple-200 mb-2">
-            <span>Lvl {currentLevel}</span>
-            <span>{Math.round(progressPercent)}%</span>
-            <span>Lvl {currentLevel + 1}</span>
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
+          <div className="flex justify-between text-sm text-gray-600 mb-3">
+            <span className="font-medium">Level {currentLevel}</span>
+            <span className="font-bold text-gray-900">{Math.round(progressPercent)}%</span>
+            <span className="font-medium">Level {currentLevel + 1}</span>
           </div>
-          <div className="relative w-full h-4 bg-indigo-950/50 rounded-full overflow-hidden">
+          <div className="relative w-full h-6 bg-gray-200 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 transition-all duration-1000 rounded-full"
+              className="h-full bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 transition-all duration-1000 rounded-full"
               style={{ width: `${Math.min(progressPercent, 100)}%` }}
             >
-              <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+              <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
             </div>
           </div>
         </div>
 
         {/* Performance & Weak Areas Row */}
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 gap-6">
           {/* Quiz Stats */}
-          <div className="bg-gradient-to-br from-blue-900/50 to-indigo-900/50 backdrop-blur-md rounded-xl border border-blue-500/30 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="w-5 h-5 text-blue-400" />
-              <h3 className="font-bold text-white">Performance</h3>
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-6 h-6 text-blue-600" />
+              <h3 className="font-bold text-gray-900 text-lg">Performance</h3>
             </div>
             
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="text-center p-2 bg-white/10 rounded-lg">
-                <Award className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-yellow-400">{stats.highestScore}%</p>
-                <p className="text-xs text-gray-300">Best</p>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <Award className="w-5 h-5 text-yellow-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-yellow-600">{stats.highestScore}%</p>
+                <p className="text-xs text-gray-600 mt-1">Best</p>
               </div>
-              <div className="text-center p-2 bg-white/10 rounded-lg">
-                <CheckCircle className="w-4 h-4 text-green-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-green-400">{stats.passedQuizzes}</p>
-                <p className="text-xs text-gray-300">Passed</p>
+              <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <CheckCircle className="w-5 h-5 text-green-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-green-600">{stats.passedQuizzes}</p>
+                <p className="text-xs text-gray-600 mt-1">Passed</p>
               </div>
-              <div className="text-center p-2 bg-white/10 rounded-lg">
-                <XCircle className="w-4 h-4 text-red-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-red-400">{stats.failedQuizzes}</p>
-                <p className="text-xs text-gray-300">Retry</p>
+              <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <XCircle className="w-5 h-5 text-red-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-red-600">{stats.failedQuizzes}</p>
+                <p className="text-xs text-gray-600 mt-1">Retry</p>
               </div>
             </div>
             
-            <div className="text-center text-xs text-purple-200">
-              Total: {stats.totalQuizzes} quizzes
+            <div className="text-center text-sm text-gray-600 pt-3 border-t border-gray-200">
+              Total: <span className="font-bold text-gray-900">{stats.totalQuizzes}</span> quizzes
             </div>
           </div>
 
           {/* Weak Areas */}
-          <div className="bg-gradient-to-br from-orange-900/50 to-red-900/50 backdrop-blur-md rounded-xl border border-orange-500/30 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Target className="w-5 h-5 text-orange-400" />
-              <h3 className="font-bold text-white">Focus On</h3>
+          <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-6 h-6 text-orange-600" />
+              <h3 className="font-bold text-gray-900 text-lg">Focus On</h3>
             </div>
             
             {stats.weakAreas.length > 0 ? (
-              <div className="space-y-2 max-h-32 overflow-y-auto">
+              <div className="space-y-3">
                 {stats.weakAreas.slice(0, 3).map((area, i) => (
-                  <div key={i} className="bg-white/10 rounded-lg p-2">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-white text-sm font-medium">{area.area}</span>
-                      <span className="text-orange-400 text-xs font-bold">{area.count}</span>
+                  <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-900 text-sm font-medium">{area.area}</span>
+                      <span className="text-orange-600 text-sm font-bold">{area.count} errors</span>
                     </div>
-                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full"
                         style={{ width: `${Math.min((area.count / Math.max(...stats.weakAreas.map(a => a.count))) * 100, 100)}%` }}
@@ -288,64 +291,55 @@ export default function MonitorStudentProgress() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-4">
-                <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-1" />
-                <p className="text-white text-sm font-bold">All Good! 🎉</p>
+              <div className="text-center py-8">
+                <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
+                <p className="text-gray-900 text-base font-bold">All Good! 🎉</p>
+                <p className="text-gray-600 text-sm mt-1">Keep up the great work!</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Recent Activity */}
-        <div className="bg-gradient-to-br from-pink-900/50 to-purple-900/50 backdrop-blur-md rounded-xl border border-pink-500/30 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Book className="w-5 h-5 text-pink-400" />
-            <h3 className="font-bold text-white">Recent Activity</h3>
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
+          <div className="flex items-center gap-2 mb-4">
+            <Book className="w-6 h-6 text-pink-600" />
+            <h3 className="font-bold text-gray-900 text-lg">Recent Activity</h3>
           </div>
 
           {activityData.length > 0 ? (
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="space-y-3">
               {activityData.slice(0, 5).map((activity, i) => (
-                <div key={i} className="bg-white/10 rounded-lg p-3 hover:bg-white/20 transition-all">
+                <div key={i} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-all border border-gray-200">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{getModeIcon(activity.mode)}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{getModeIcon(activity.mode)}</span>
                       <div>
-                        <h4 className="text-white text-sm font-bold truncate max-w-[150px]">
+                        <h4 className="text-gray-900 text-base font-bold truncate max-w-[200px]">
                           {activity.themeTitle || activity.storyTitle || 'Quiz'}
                         </h4>
-                        <p className="text-purple-200 text-xs">{activity.mode}</p>
+                        <p className="text-gray-600 text-sm">{activity.mode}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`text-lg font-bold ${activity.percentage >= 60 ? 'text-green-400' : 'text-red-400'}`}>
+                      <div className={`text-xl font-bold ${activity.percentage >= 60 ? 'text-green-600' : 'text-red-600'}`}>
                         {activity.percentage}%
                       </div>
-                      <p className="text-purple-200 text-xs">{activity.score}/{activity.maxScore}</p>
+                      <p className="text-gray-600 text-sm">{activity.score}/{activity.maxScore}</p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-6">
-              <Book className="w-12 h-12 text-purple-400 mx-auto mb-2 opacity-50" />
-              <p className="text-white text-sm">No activity yet</p>
+            <div className="text-center py-12">
+              <Book className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-900 text-base font-medium">No activity yet</p>
+              <p className="text-gray-600 text-sm mt-1">Start practicing to see your progress here!</p>
             </div>
           )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-      `}</style>
     </div>
   );
 }

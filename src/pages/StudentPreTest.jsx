@@ -192,25 +192,27 @@ const StudentPreTest = ({ onComplete }) => {
       });
 
       // 🔧 CALL AI BACKEND TO GENERATE INITIAL LEVELS
-      try {
-        const response = await authenticatedFetch('http://localhost:5000/quiz/generate-levels', { // ✅ Use authenticatedFetch
-          method: 'POST',
-          body: JSON.stringify({
-            startingLevel,
-            weakAreas,     // e.g., { "phonics_level_2": ["digraph_sh"] }
-            // ❌ Removed: grade, skillLevel
-          })
-        });
+// Inside savePreTestScore (around line 208)
 
-        if (response.ok) {
-          console.log("✅ AI-generated levels created successfully!");
-        } else {
-          const errorData = await response.json();
-          console.error("❌ Failed to generate AI levels:", errorData);
-        }
-      } catch (aiError) {
-        console.error("💥 AI backend error:", aiError);
-      }
+try {
+  // 1. Rename 'response' to 'data' to reflect that it is the parsed JSON data.
+  const data = await authenticatedFetch('http://localhost:5000/quiz/generate-single-quiz', {
+    method: 'POST',
+    body: JSON.stringify({
+      level: startingLevel,
+      weakAreas,
+    })
+  });
+
+  // 2. Since authenticatedFetch handles error throwing, this block is ONLY reached on success.
+  console.log("✅ AI-generated levels created successfully! Data:", data);
+
+} catch (aiError) {
+  // This block catches the errors thrown by authenticatedFetch (e.g., 404, 500, 'No words found').
+  console.error("💥 AI backend error:", aiError);
+}
+
+// NOTE: Remove the inner `if (response.ok) { ... } else { ... }` logic entirely.
 
       console.log("✅ Pre-test score saved successfully!");
     } catch (error) {

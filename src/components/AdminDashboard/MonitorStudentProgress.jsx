@@ -250,11 +250,11 @@ export default function MonitorStudentProgress() {
         <title>Platform Analytics Report</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #4f46e5; }
-          h2 { color: #6366f1; margin-top: 30px; }
+          h1 { color: #059669; }
+          h2 { color: #10b981; margin-top: 30px; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #4f46e5; color: white; }
+          th { background-color: #059669; color: white; }
           tr:nth-child(even) { background-color: #f2f2f2; }
           .stat-box { display: inline-block; margin: 10px; padding: 15px; background: #f0f0f0; border-radius: 8px; }
         </style>
@@ -326,64 +326,67 @@ export default function MonitorStudentProgress() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-          <p className="text-white text-xl">Loading platform analytics...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-800 text-xl">Loading platform analytics...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 p-6">
+    <div className="min-h-screen text-black p-16 bg-[#FDFBF7] rounded-3xl overflow-hidden mt-14 shadow-sm">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 drop-shadow-lg">
-            🎯 Admin Analytics Dashboard
-          </h1>
-          <p className="text-purple-200">Complete platform insights and performance metrics</p>
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Admin Analytics Dashboard</h1>
+          </div>
+          <p className="text-gray-600">Complete platform insights and performance metrics</p>
         </div>
 
         {/* Platform Usage */}
-        <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-md rounded-xl border border-purple-500/30 p-6">
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
           <div className="flex items-center gap-2 mb-6">
-            <Activity className="w-7 h-7 text-purple-400" />
-            <h2 className="text-2xl font-bold text-white">Platform Usage</h2>
+            <Activity className="w-7 h-7 text-purple-600" />
+            <h2 className="text-2xl font-bold text-gray-900">Platform Usage</h2>
           </div>
 
           <div className="grid md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <Users className="w-10 h-10 text-blue-400 mx-auto mb-2" />
-              <p className="text-4xl font-bold text-white">{platformData.totalStudents}</p>
-              <p className="text-sm text-purple-200">Total Students</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <Users className="w-10 h-10 text-blue-600 mx-auto mb-2" />
+              <p className="text-4xl font-bold text-gray-900">{platformData.totalStudents}</p>
+              <p className="text-sm text-gray-600">Total Students</p>
             </div>
 
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <BookOpen className="w-10 h-10 text-green-400 mx-auto mb-2" />
-              <p className="text-4xl font-bold text-white">{platformData.totalTeachers}</p>
-              <p className="text-sm text-purple-200">Total Teachers</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <BookOpen className="w-10 h-10 text-green-600 mx-auto mb-2" />
+              <p className="text-4xl font-bold text-gray-900">{platformData.totalTeachers}</p>
+              <p className="text-sm text-gray-600">Total Teachers</p>
             </div>
 
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <Clock className="w-10 h-10 text-yellow-400 mx-auto mb-2" />
-              <p className="text-xl font-bold text-white">{platformData.mostActiveTime}</p>
-              <p className="text-sm text-purple-200">Most Active Time</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <Clock className="w-10 h-10 text-yellow-600 mx-auto mb-2" />
+              <p className="text-xl font-bold text-gray-900">{platformData.mostActiveTime}</p>
+              <p className="text-sm text-gray-600">Most Active Time</p>
             </div>
 
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <Zap className="w-10 h-10 text-orange-400 mx-auto mb-2" />
-              <p className="text-xl font-bold text-white">{platformData.mostUsedFeature}</p>
-              <p className="text-sm text-purple-200">Most Used Feature</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <Zap className="w-10 h-10 text-orange-600 mx-auto mb-2" />
+              <p className="text-xl font-bold text-gray-900">{platformData.mostUsedFeature}</p>
+              <p className="text-sm text-gray-600">Most Used Feature</p>
             </div>
           </div>
 
           {/* Charts Row */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Feature Usage Pie Chart */}
-            <div className="bg-white/5 rounded-lg p-4">
-              <h3 className="text-lg font-bold text-white mb-4 text-center">Feature Usage Distribution</h3>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Feature Usage Distribution</h3>
               {platformData.featureUsage.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
@@ -405,70 +408,70 @@ export default function MonitorStudentProgress() {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-center py-12 text-white">No data available</div>
+                <div className="text-center py-12 text-gray-600">No data available</div>
               )}
             </div>
 
             {/* Time Distribution Bar Chart */}
-            <div className="bg-white/5 rounded-lg p-4">
-              <h3 className="text-lg font-bold text-white mb-4 text-center">Activity by Time of Day</h3>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Activity by Time of Day</h3>
               {timeDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={timeDistribution}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="time" stroke="#fff" tick={{ fontSize: 11 }} />
-                    <YAxis stroke="#fff" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 11 }} />
+                    <YAxis stroke="#374151" />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
                     />
-                    <Bar dataKey="activities" fill="#a78bfa" />
+                    <Bar dataKey="activities" fill="#8b5cf6" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-center py-12 text-white">No data available</div>
+                <div className="text-center py-12 text-gray-600">No data available</div>
               )}
             </div>
           </div>
         </div>
 
         {/* Learning Analytics */}
-        <div className="bg-gradient-to-br from-blue-900/50 to-cyan-900/50 backdrop-blur-md rounded-xl border border-blue-500/30 p-6">
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
           <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="w-7 h-7 text-blue-400" />
-            <h2 className="text-2xl font-bold text-white">Learning Analytics</h2>
+            <BarChart3 className="w-7 h-7 text-blue-600" />
+            <h2 className="text-2xl font-bold text-gray-900">Learning Analytics</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <Award className="w-10 h-10 text-yellow-400 mx-auto mb-2" />
-              <p className="text-4xl font-bold text-white">{learningData.averageScore}%</p>
-              <p className="text-sm text-blue-200">Average Score (All Students)</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <Award className="w-10 h-10 text-yellow-600 mx-auto mb-2" />
+              <p className="text-4xl font-bold text-gray-900">{learningData.averageScore}%</p>
+              <p className="text-sm text-gray-600">Average Score (All Students)</p>
             </div>
 
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{learningData.mostFailedLevel}</p>
-              <p className="text-sm text-blue-200">Most Failed Level</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <AlertCircle className="w-10 h-10 text-red-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-gray-900">{learningData.mostFailedLevel}</p>
+              <p className="text-sm text-gray-600">Most Failed Level</p>
             </div>
 
-            <div className="bg-white/10 rounded-lg p-5 text-center">
-              <Target className="w-10 h-10 text-green-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{learningData.mostCompletedLevel}</p>
-              <p className="text-sm text-blue-200">Most Completed Level</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all">
+              <Target className="w-10 h-10 text-green-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-gray-900">{learningData.mostCompletedLevel}</p>
+              <p className="text-sm text-gray-600">Most Completed Level</p>
             </div>
           </div>
 
           {/* Level Statistics Chart */}
-          <div className="bg-white/5 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-bold text-white mb-4 text-center">Level Completion vs Failure</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Level Completion vs Failure</h3>
             {learningData.levelStats.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={learningData.levelStats}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="level" stroke="#fff" />
-                  <YAxis stroke="#fff" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="level" stroke="#374151" />
+                  <YAxis stroke="#374151" />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
                   />
                   <Legend />
                   <Bar dataKey="completed" fill="#10b981" name="Completed" />
@@ -476,22 +479,22 @@ export default function MonitorStudentProgress() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-center py-12 text-white">No level data available</div>
+              <div className="text-center py-12 text-gray-600">No level data available</div>
             )}
           </div>
 
           {/* Common Weak Areas */}
-          <div className="bg-white/5 rounded-lg p-5">
-            <h3 className="text-lg font-bold text-white mb-4">Common Weak Areas Across Platform</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Common Weak Areas Across Platform</h3>
             {learningData.commonWeakAreas.length > 0 ? (
               <div className="space-y-3">
                 {learningData.commonWeakAreas.map((area, i) => (
-                  <div key={i} className="bg-white/10 rounded-lg p-3">
+                  <div key={i} className="bg-white border border-gray-200 rounded-lg p-3">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-white font-medium">{area.area}</span>
-                      <span className="text-red-400 font-bold text-lg">{area.count} errors</span>
+                      <span className="text-gray-900 font-medium">{area.area}</span>
+                      <span className="text-red-600 font-bold text-lg">{area.count} errors</span>
                     </div>
-                    <div className="w-full bg-white/20 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="h-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
                         style={{ 
@@ -503,58 +506,58 @@ export default function MonitorStudentProgress() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-white">No weak areas identified</div>
+              <div className="text-center py-8 text-gray-600">No weak areas identified</div>
             )}
           </div>
         </div>
 
         {/* Export Reports */}
-        <div className="bg-gradient-to-br from-green-900/50 to-emerald-900/50 backdrop-blur-md rounded-xl border border-green-500/30 p-6">
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
           <div className="flex items-center gap-2 mb-4">
-            <Download className="w-7 h-7 text-green-400" />
-            <h2 className="text-2xl font-bold text-white">Export Reports</h2>
+            <Download className="w-7 h-7 text-green-600" />
+            <h2 className="text-2xl font-bold text-gray-900">Export Reports</h2>
           </div>
 
-          <p className="text-green-200 mb-6">Download comprehensive analytics in your preferred format</p>
+          <p className="text-gray-600 mb-6">Download comprehensive analytics in your preferred format</p>
 
           <div className="grid md:grid-cols-3 gap-4">
             <button
               onClick={exportToCSV}
-              className="bg-white/10 hover:bg-white/20 text-white rounded-xl p-6 transition-all flex flex-col items-center gap-3 group"
+              className="bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:shadow-md text-gray-900 rounded-lg p-6 transition-all flex flex-col items-center gap-3 group"
             >
-              <Table className="w-12 h-12 text-green-400 group-hover:scale-110 transition-transform" />
+              <Table className="w-12 h-12 text-green-600 group-hover:scale-110 transition-transform" />
               <div className="text-center">
                 <p className="font-bold text-lg">Export as CSV</p>
-                <p className="text-sm text-green-200">Spreadsheet compatible</p>
+                <p className="text-sm text-gray-600">Spreadsheet compatible</p>
               </div>
             </button>
 
             <button
               onClick={exportToExcel}
-              className="bg-white/10 hover:bg-white/20 text-white rounded-xl p-6 transition-all flex flex-col items-center gap-3 group"
+              className="bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:shadow-md text-gray-900 rounded-lg p-6 transition-all flex flex-col items-center gap-3 group"
             >
-              <FileSpreadsheet className="w-12 h-12 text-blue-400 group-hover:scale-110 transition-transform" />
+              <FileSpreadsheet className="w-12 h-12 text-blue-600 group-hover:scale-110 transition-transform" />
               <div className="text-center">
                 <p className="font-bold text-lg">Export as Excel</p>
-                <p className="text-sm text-green-200">Full Excel workbook</p>
+                <p className="text-sm text-gray-600">Full Excel workbook</p>
               </div>
             </button>
 
             <button
               onClick={exportToPDF}
-              className="bg-white/10 hover:bg-white/20 text-white rounded-xl p-6 transition-all flex flex-col items-center gap-3 group"
+              className="bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:shadow-md text-gray-900 rounded-lg p-6 transition-all flex flex-col items-center gap-3 group"
             >
-              <FileText className="w-12 h-12 text-red-400 group-hover:scale-110 transition-transform" />
+              <FileText className="w-12 h-12 text-red-600 group-hover:scale-110 transition-transform" />
               <div className="text-center">
                 <p className="font-bold text-lg">Export as PDF</p>
-                <p className="text-sm text-green-200">Printable report</p>
+                <p className="text-sm text-gray-600">Printable report</p>
               </div>
             </button>
           </div>
 
-          <div className="mt-4 bg-white/5 rounded-lg p-4">
-            <p className="text-sm text-green-200 text-center">
-              📊 Total Records: <span className="font-bold text-white">{exportData.length}</span> activities ready for export
+          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm text-gray-600 text-center">
+              📊 Total Records: <span className="font-bold text-gray-900">{exportData.length}</span> activities ready for export
             </p>
           </div>
         </div>
