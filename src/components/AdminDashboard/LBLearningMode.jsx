@@ -96,7 +96,7 @@ export default function LBLearningMode() {
       console.log("Sending to edit endpoint for ID:", editingWord.id, "Data:", wordDataToSend); // Log data being sent
 
       // Use the authenticatedFetch helper to call your backend's edit endpoint
-      const result = await authenticatedFetch(`http://localhost:5000/word/edit-word/${editingWord.id}`, { // Use editingWord.id for the URL
+      const result = await authenticatedFetch(`https://spellread-master-production.up.railway.app/word/edit-word/${editingWord.id}`, { // Use editingWord.id for the URL
         method: 'PUT',
         body: JSON.stringify(wordDataToSend), // Send only the fields being updated
       });

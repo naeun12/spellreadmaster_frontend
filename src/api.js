@@ -3,7 +3,7 @@ import { auth } from './firebase'; // Import the correctly initialized auth inst
 import { getIdToken } from 'firebase/auth'; // Import getIdToken function
 
 // Backend URL - Change this to your production URL when deploying
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL ='http://spellread-master-production.up.railway.app';
 
 /**
  * Makes an authenticated API call to your backend.

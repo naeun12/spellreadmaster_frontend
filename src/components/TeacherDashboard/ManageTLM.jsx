@@ -1,5 +1,6 @@
+// src/components/Teacher/ManageTLM.jsx
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../../firebase';
+import { db, auth } from '../../firebase'; // Keep db import if needed elsewhere
 import {
   collection,
   getDocs,
@@ -8,101 +9,107 @@ import {
   addDoc,
   serverTimestamp,
   doc,
-  updateDoc,   // ← make sure this is included
+  updateDoc,
   deleteDoc,
   arrayUnion,
-  writeBatch,    // ← and this
+  writeBatch,
+  // Removed getDoc, setDoc imports as they are not needed for this part
 } from 'firebase/firestore';
-import { Puzzle, Plus, Edit2, Trash2, Save, X, Search, Filter, ChevronDown, ChevronUp, Upload, Wand2, Sparkles, Send } from 'lucide-react';
+// --- NEW IMPORTS START ---
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { File, Download, Upload } from 'lucide-react'; // Added File and Download icons
+// --- NEW IMPORTS END ---
+import { Puzzle, Plus, Edit2, Trash2, Save, X, Search, Filter, ChevronDown, ChevronUp, Wand2, Sparkles, Send } from 'lucide-react';
 
 export default function ManageTLM() {
   const [themes, setThemes] = useState([]);
   const [loadingThemes, setLoadingThemes] = useState(true);
-  
-//   // Firestore CRUD functions
-//   const fetchThemes = async () => {
-//     setLoadingThemes(true);
-//     try {
-//       const querySnapshot = await getDocs(collection(db, 'themes'));
-//       const themeList = querySnapshot.docs.map(docSnap => ({
-//         id: docSnap.id,
-//         ...docSnap.data()
-//       }));
-//       setThemes(themeList);
-//     } catch {
-//       alert('Failed to fetch themes from database.');
-//     } finally {
-//       setLoadingThemes(false);
-//     }
-//   };
 
-useEffect(() => {
-  const loadTeacherData = async () => {
-    const teacherId = auth.currentUser?.uid;
-    if (!teacherId) return;
+  // --- NEW STATE FOR TEACHER'S LESSON PLAN START ---
+  // We will store the URL and name only for the currently loaded/last uploaded file
+  // They will not be persisted in Firestore by this component anymore
+  const [lessonPlanUrl, setLessonPlanUrl] = useState('');
+  const [lessonPlanName, setLessonPlanName] = useState('');
+  const [uploadingLessonPlan, setUploadingLessonPlan] = useState(false); // Single state for overall upload status
+  // --- NEW STATE FOR TEACHER'S LESSON PLAN END ---
 
-    setLoadingThemes(true);
+  // Firestore CRUD functions for themes
+  // ... (existing createTheme, updateTheme, deleteTheme functions remain the same)
+
+  useEffect(() => {
+    const loadTeacherData = async () => {
+      const teacherId = auth.currentUser?.uid;
+      if (!teacherId) return;
+      setLoadingThemes(true);
+      try {
+        // Fetch ONLY themes created by this teacher
+        const themesQuery = query(collection(db, 'themes'), where('createdBy', '==', teacherId));
+        const themesSnap = await getDocs(themesQuery);
+        const themeList = themesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Fetch students assigned to this teacher
+        const studentsQuery = query(collection(db, 'students'), where('teacherId', '==', teacherId));
+        const studentsSnap = await getDocs(studentsQuery);
+        const studentList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        setThemes(themeList);
+        setStudents(studentList);
+
+        // --- REMOVED: Fetch teacher's lesson plan data from subcollection ---
+        // This section is removed because we are no longer storing metadata in Firestore
+        // --- END REMOVED SECTION ---
+      } catch (error) {
+        console.error("Error loading teacher data:", error); // Improved error message
+        alert('Failed to load your data.');
+      } finally {
+        setLoadingThemes(false);
+      }
+    };
+
+    loadTeacherData();
+  }, []); // Dependencies removed as loadTeacherData is defined inside useEffect
+
+  const createTheme = async (theme) => {
     try {
-      // Fetch ONLY themes created by this teacher
-      const themesQuery = query(collection(db, 'themes'), where('createdBy', '==', teacherId));
-      const themesSnap = await getDocs(themesQuery);
-      const themeList = themesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Fetch students assigned to this teacher
-      const studentsQuery = query(collection(db, 'students'), where('teacherId', '==', teacherId));
-      const studentsSnap = await getDocs(studentsQuery);
-      const studentList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      setThemes(themeList);
-      setStudents(studentList);
-    } catch {
-      alert('Failed to load your data.');
-    } finally {
-      setLoadingThemes(false);
+      const newTheme = {
+        ...theme,
+        createdBy: auth.currentUser.uid,
+        creatorRole: 'teacher' // ← important!
+      };
+      const docRef = await addDoc(collection(db, 'themes'), newTheme);
+      setThemes(prev => [...prev, { ...newTheme, id: docRef.id }]);
+    } catch (error) { // Added error parameter
+      console.error("Create theme error:", error); // Log error for debugging
+      alert('Failed to create theme.');
     }
   };
 
-  loadTeacherData();
-}, []);
-
-const createTheme = async (theme) => {
-  try {
-    const newTheme = {
-      ...theme,
-      createdBy: auth.currentUser.uid,
-      creatorRole: 'teacher' // ← important!
-    };
-    const docRef = await addDoc(collection(db, 'themes'), newTheme);
-    setThemes(prev => [...prev, { ...newTheme, id: docRef.id }]);
-  } catch {
-    alert('Failed to create theme.');
-  }
-};
-
-const updateTheme = async (id, theme) => {
-  try {
-    const existing = themes.find(t => t.id === id);
-    const updated = {
-      ...theme,
-      createdBy: existing?.createdBy || auth.currentUser.uid,
-      creatorRole: existing?.creatorRole || 'teacher'
-    };
-    await updateDoc(doc(db, 'themes', id), updated);
-    setThemes(prev => prev.map(t => t.id === id ? { ...updated, id } : t));
-  } catch {
-    alert('Failed to update theme.');
-  }
-};
+  const updateTheme = async (id, theme) => {
+    try {
+      const existing = themes.find(t => t.id === id);
+      const updated = {
+        ...theme,
+        createdBy: existing?.createdBy || auth.currentUser.uid,
+        creatorRole: existing?.creatorRole || 'teacher'
+      };
+      await updateDoc(doc(db, 'themes', id), updated);
+      setThemes(prev => prev.map(t => t.id === id ? { ...updated, id } : t));
+    } catch (error) { // Added error parameter
+      console.error("Update theme error:", error); // Log error for debugging
+      alert('Failed to update theme.');
+    }
+  };
 
   const deleteTheme = async (id) => {
     try {
       await deleteDoc(doc(db, 'themes', id));
       setThemes(prev => prev.filter(t => t.id !== id));
-    } catch {
+    } catch (error) { // Added error parameter
+      console.error("Delete theme error:", error); // Log error for debugging
       alert('Failed to delete theme.');
     }
   };
 
+  // ... (existing state declarations remain the same)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTheme, setEditingTheme] = useState(null);
   const [expandedTheme, setExpandedTheme] = useState(null);
@@ -119,7 +126,6 @@ const updateTheme = async (id, theme) => {
   const [students, setStudents] = useState([]); // to store teacher's students
   const [alreadyAssigned, setAlreadyAssigned] = useState(new Set());
   const [setFilteredStudentsCount] = useState(0);
-
   const [formData, setFormData] = useState({
     title: '',
     difficulty: 'Easy',
@@ -128,7 +134,6 @@ const updateTheme = async (id, theme) => {
     description: '',
     words: []
   });
-
   const [wordInput, setWordInput] = useState({ word: '', definition: '', image: '' });
 
   // AI Generation state
@@ -143,108 +148,101 @@ const updateTheme = async (id, theme) => {
     { value: 'from-cyan-500 to-teal-500', label: 'Cyan', preview: 'bg-gradient-to-r from-cyan-500 to-teal-500' },
     { value: 'from-pink-500 to-rose-500', label: 'Pink', preview: 'bg-gradient-to-r from-pink-500 to-rose-500' }
   ];
-
   const difficultyOptions = ['Easy', 'Medium', 'Hard'];
 
-const handleAssignClick = async (theme) => {
-  // Get current assignments for this theme
-  const assignmentsRef = collection(db, 'assignments');
-  const q = query(
-    assignmentsRef,
-    where('themeId', '==', theme.id),
-    where('teacherId', '==', auth.currentUser.uid)
-  );
-  const snapshot = await getDocs(q);
-  
-  const alreadyAssignedStudentIds = new Set();
-  snapshot.docs.forEach(doc => {
-    const data = doc.data();
-    data.studentIds.forEach(id => alreadyAssignedStudentIds.add(id));
-  });
+  // ... (existing handleAssignClick, handleAssignSubmit, toggleStudent, toggleSelectAll, isAllFilteredSelected, etc. remain the same)
 
-  setSelectedTheme(theme);
-  setAlreadyAssigned(alreadyAssignedStudentIds); // new state
-  setSelectedStudentIds(new Set());
-  setSearchStudent('');
-  setIsAssignModalOpen(true);
-};
-
-const handleAssignSubmit = async () => {
-  if (selectedStudentIds.size === 0) {
-    alert('Please select at least one student.');
-    return;
-  }
-
-  const batch = writeBatch(db);
-  const studentIdArray = Array.from(selectedStudentIds);
-
-  // 1. Create assignment record (for teacher tracking)
-  batch.set(doc(collection(db, 'assignments')), {
-    themeId: selectedTheme.id,
-    teacherId: auth.currentUser.uid,
-    studentIds: studentIdArray,
-    assignedAt: serverTimestamp(),
-    status: 'assigned'
-  });
-
-  // 2. Add themeId to each student's assignedThemeIds
-  studentIdArray.forEach(studentId => {
-    batch.update(doc(db, 'students', studentId), {
-      assignedThemeIds: arrayUnion(selectedTheme.id)
+  const handleAssignClick = async (theme) => {
+    // Get current assignments for this theme
+    const assignmentsRef = collection(db, 'assignments');
+    const q = query(
+      assignmentsRef,
+      where('themeId', '==', theme.id),
+      where('teacherId', '==', auth.currentUser.uid)
+    );
+    const snapshot = await getDocs(q);
+    const alreadyAssignedStudentIds = new Set();
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      data.studentIds.forEach(id => alreadyAssignedStudentIds.add(id));
     });
-  });
+    setSelectedTheme(theme);
+    setAlreadyAssigned(alreadyAssignedStudentIds); // new state
+    setSelectedStudentIds(new Set());
+    setSearchStudent('');
+    setIsAssignModalOpen(true);
+  };
 
-  try {
-    await batch.commit();
-    alert('Quiz assigned successfully!');
-    setIsAssignModalOpen(false);
-    setSelectedStudentIds(new Set()); // reset selection
-  } catch (err) {
-    console.error('Assignment error:', err);
-    alert('Failed to assign quiz.');
-  }
-};
+  const handleAssignSubmit = async () => {
+    if (selectedStudentIds.size === 0) {
+      alert('Please select at least one student.');
+      return;
+    }
+    const batch = writeBatch(db);
+    const studentIdArray = Array.from(selectedStudentIds);
+    // 1. Create assignment record (for teacher tracking)
+    batch.set(doc(collection(db, 'assignments')), {
+      themeId: selectedTheme.id,
+      teacherId: auth.currentUser.uid,
+      studentIds: studentIdArray,
+      assignedAt: serverTimestamp(),
+      status: 'assigned'
+    });
+    // 2. Add themeId to each student's assignedThemeIds
+    studentIdArray.forEach(studentId => {
+      batch.update(doc(db, 'students', studentId), {
+        assignedThemeIds: arrayUnion(selectedTheme.id)
+      });
+    });
+    try {
+      await batch.commit();
+      alert('Quiz assigned successfully!');
+      setIsAssignModalOpen(false);
+      setSelectedStudentIds(new Set()); // reset selection
+    } catch (err) {
+      console.error('Assignment error:', err);
+      alert('Failed to assign quiz.');
+    }
+  };
 
-    // Toggle a single student
-const toggleStudent = (studentId) => {
-  const newSet = new Set(selectedStudentIds);
-  if (newSet.has(studentId)) {
-    newSet.delete(studentId);
-  } else {
-    newSet.add(studentId);
-  }
-  setSelectedStudentIds(newSet);
-};
+  // Toggle a single student
+  const toggleStudent = (studentId) => {
+    const newSet = new Set(selectedStudentIds);
+    if (newSet.has(studentId)) {
+      newSet.delete(studentId);
+    } else {
+      newSet.add(studentId);
+    }
+    setSelectedStudentIds(newSet);
+  };
 
-// Toggle "Select All" (only for filtered students)
-const toggleSelectAll = () => {
-  const filteredStudents = students.filter(s => 
-    !alreadyAssigned.has(s.id) && 
-    (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
-  );
-  
-  setFilteredStudentsCount(filteredStudents.length);
-  const allSelected = filteredStudents.every(s => selectedStudentIds.has(s.id));
-  const newSet = new Set(selectedStudentIds);
-
-  if (allSelected) {
-    filteredStudents.forEach(s => newSet.delete(s.id));
-  } else {
-    filteredStudents.forEach(s => newSet.add(s.id));
-  }
-  
-  setSelectedStudentIds(newSet);
-};
-
+  // Toggle "Select All" (only for filtered students)
+  const toggleSelectAll = () => {
+    const filteredStudents = students.filter(s =>
+      !alreadyAssigned.has(s.id) &&
+      (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+    );
+    setFilteredStudentsCount(filteredStudents.length);
+    const allSelected = filteredStudents.every(s => selectedStudentIds.has(s.id));
+    const newSet = new Set(selectedStudentIds);
+    if (allSelected) {
+      filteredStudents.forEach(s => newSet.delete(s.id));
+    } else {
+      filteredStudents.forEach(s => newSet.add(s.id));
+    }
+    setSelectedStudentIds(newSet);
+  };
 
   // Check if "Select All" should be checked
   const isAllFilteredSelected = () => {
-  const filteredStudents = students.filter(s => 
-    !alreadyAssigned.has(s.id) && 
-    (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+    const filteredStudents = students.filter(s =>
+      !alreadyAssigned.has(s.id) &&
+      (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
     );
     return filteredStudents.length > 0 && filteredStudents.every(s => selectedStudentIds.has(s.id));
-    };
+  };
+
+  // ... (existing handleOpenModal, handleCloseModal, handleAddWord, handleRemoveWord, handleWordChange, handleBulkImport, handleCSVImport, generateWithAI, parseAIResponse, handleSaveTheme, handleDeleteTheme, filteredThemes logic remain the same)
 
   const handleOpenModal = (theme = null) => {
     if (theme) {
@@ -277,7 +275,7 @@ const toggleSelectAll = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingTheme(null);
-    setWordInput({ word: '', definition: '' });
+    setWordInput({ word: '', definition: '', image: '' });
     setBulkInput('');
     setShowAIGenerator(false);
     setAiError('');
@@ -309,7 +307,6 @@ const toggleSelectAll = () => {
 
   const handleBulkImport = () => {
     if (!bulkInput.trim()) return;
-
     const lines = bulkInput.trim().split('\n');
     const newWords = lines
       .map(line => {
@@ -324,7 +321,6 @@ const toggleSelectAll = () => {
         return null;
       })
       .filter(w => w !== null);
-
     if (newWords.length > 0) {
       setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
       setBulkInput('');
@@ -335,24 +331,19 @@ const toggleSelectAll = () => {
   const handleCSVImport = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target.result;
       const lines = text.split('\n');
-      
-      const startIndex = lines[0].toLowerCase().includes('word') || 
-                        lines[0].toLowerCase().includes('definition') ? 1 : 0;
-      
+      const startIndex = lines[0].toLowerCase().includes('word') ||
+        lines[0].toLowerCase().includes('definition') ? 1 : 0;
       const newWords = [];
       for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
-
         const parts = [];
         let current = '';
         let inQuotes = false;
-        
         for (let j = 0; j < line.length; j++) {
           const char = line[j];
           if (char === '"') {
@@ -365,9 +356,7 @@ const toggleSelectAll = () => {
           }
         }
         parts.push(current.trim());
-
         const cleanParts = parts.map(p => p.replace(/^["']|["']$/g, ''));
-
         if (cleanParts.length >= 2 && cleanParts[0] && cleanParts[1]) {
           newWords.push({
             word: cleanParts[0],
@@ -375,7 +364,6 @@ const toggleSelectAll = () => {
           });
         }
       }
-
       if (newWords.length > 0) {
         setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
         alert(`Successfully imported ${newWords.length} words from CSV!`);
@@ -383,60 +371,53 @@ const toggleSelectAll = () => {
         alert('No valid words found in CSV file.');
       }
     };
-
     reader.readAsText(file);
     e.target.value = '';
   };
 
   const generateWithAI = async (customPrompt = '') => {
-  setAiLoading(true);
-  setAiError('');
-
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!API_KEY) {
-    setAiError('Missing Gemini API key. Check your .env file.');
-    setAiLoading(false);
-    return;
-  }
-
-  const prompt = customPrompt || 
-    `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${formData.title || 'general vocabulary'}". For each word, provide a very simple definition that a 6-year-old can understand. Format as: word, definition (one per line). Only return the word list, no additional text.`;
-
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+    setAiLoading(true);
+    setAiError('');
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!API_KEY) {
+      setAiError('Missing Gemini API key. Check your .env file.');
+      setAiLoading(false);
+      return;
+    }
+    const prompt = customPrompt ||
+      `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${formData.title || 'general vocabulary'}". For each word, provide a very simple definition that a 6-year-old can understand. Format as: word, definition (one per line). Only return the word list, no additional text.`;
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`HTTP ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
       }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`HTTP ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+      const data = await response.json();
+      const text = data.candidates[0].content.parts[0].text;
+      const newWords = parseAIResponse(text);
+      if (newWords.length > 0) {
+        setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
+        setShowAIGenerator(false);
+        alert(`Successfully generated ${newWords.length} words with AI!`);
+      } else {
+        throw new Error('No valid words found in AI response.');
+      }
+    } catch (err) {
+      console.error('Gemini AI Error:', err);
+      setAiError(`AI Error: ${err.message}`);
+    } finally {
+      setAiLoading(false);
     }
-
-    const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    const newWords = parseAIResponse(text);
-
-    if (newWords.length > 0) {
-      setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
-      setShowAIGenerator(false);
-      alert(`Successfully generated ${newWords.length} words with AI!`);
-    } else {
-      throw new Error('No valid words found in AI response.');
-    }
-  } catch (err) {
-    console.error('Gemini AI Error:', err);
-    setAiError(`AI Error: ${err.message}`);
-  } finally {
-    setAiLoading(false);
-  }
-};
+  };
 
   const parseAIResponse = (text) => {
     const lines = text.trim().split('\n');
@@ -449,7 +430,6 @@ const toggleSelectAll = () => {
             definition: match[2].trim()
           };
         }
-
         const parts = line.split(/[,|\t]/).map(p => p.trim());
         if (parts.length >= 2) {
           return {
@@ -461,7 +441,6 @@ const toggleSelectAll = () => {
       })
       .filter(item => item && item.word && item.definition);
   };
-
 
   const handleSaveTheme = async () => {
     if (!formData.title.trim() || formData.words.length === 0) {
@@ -484,10 +463,67 @@ const toggleSelectAll = () => {
 
   const filteredThemes = themes.filter(theme => {
     const matchesSearch = theme.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         theme.description.toLowerCase().includes(searchTerm.toLowerCase());
+      theme.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDifficulty = filterDifficulty === 'All' || theme.difficulty === filterDifficulty;
     return matchesSearch && matchesDifficulty;
   });
+
+  // --- NEW: Upload Teacher's Lesson Plan Function (Updated - No Firestore) ---
+  const uploadTeacherLessonPlan = async (file) => {
+    if (!file) return;
+
+    const storage = getStorage(); // Initialize storage
+    setUploadingLessonPlan(true); // Set overall loading state
+
+    try {
+      // Create a reference to the file location (e.g., lessonPlans/teacherId/filename)
+      const fileName = `${auth.currentUser.uid}/${file.name}`;
+      const fileRef = storageRef(storage, `lessonPlans/${fileName}`);
+
+      // Upload the file
+      const snapshot = await uploadBytes(fileRef, file);
+      console.log('Uploaded teacher lesson plan:', snapshot);
+
+      // Get the download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      // Update local state to show the newly uploaded file
+      setLessonPlanUrl(downloadURL);
+      setLessonPlanName(file.name);
+
+      alert('Teacher lesson plan uploaded successfully!');
+    } catch (error) {
+      console.error("Error uploading teacher lesson plan:", error);
+      alert(`Failed to upload lesson plan: ${error.message}`);
+    } finally {
+      setUploadingLessonPlan(false); // Reset loading state
+    }
+  };
+
+  // --- NEW: Handle File Input Change for Teacher's Plan ---
+  const handleTeacherLessonPlanFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      uploadTeacherLessonPlan(file);
+    }
+    e.target.value = ''; // Reset input to allow re-uploading the same file
+  };
+
+  // --- NEW: Handle Download for Teacher's Plan ---
+  const handleDownloadTeacherPlan = () => {
+    if (lessonPlanUrl) {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = lessonPlanUrl;
+      link.download = lessonPlanName || 'teacher_lesson_plan'; // Use stored filename or default
+      document.body.appendChild(link); // Append to the body (required for Firefox)
+      link.click(); // Programmatically click the link
+      document.body.removeChild(link); // Remove the link after clicking
+    } else {
+      console.error("No teacher lesson plan URL found.");
+      alert("No lesson plan file found for download.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] p-16 rounded-3xl overflow-hidden mt-14 shadow-sm">
@@ -515,7 +551,59 @@ const toggleSelectAll = () => {
               Create Theme
             </button>
           </div>
-
+          {/* --- NEW: Teacher Lesson Plan Upload/View Section --- */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Teacher Lesson Plan</h2>
+            <div className="flex items-center gap-2">
+              {lessonPlanUrl ? (
+                // If a plan URL is currently loaded in state, show download button
+                <button
+                  onClick={handleDownloadTeacherPlan}
+                  className="flex items-center gap-1 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors"
+                  title="Download Lesson Plan"
+                >
+                  <Download className="w-5 h-5" />
+                  Download Plan: {lessonPlanName}
+                </button>
+              ) : (
+                // If no plan URL is in state, show upload button
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt,.ppt,.pptx" // Specify allowed file types
+                    id="teacher-lesson-plan-upload" // Unique ID
+                    className="hidden"
+                    onChange={handleTeacherLessonPlanFileChange} // Call new handler
+                    disabled={uploadingLessonPlan} // Disable during upload
+                  />
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('teacher-lesson-plan-upload').click()} // Trigger input click
+                    disabled={uploadingLessonPlan} // Disable during upload
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      uploadingLessonPlan
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                    title="Upload Lesson Plan"
+                  >
+                    {uploadingLessonPlan ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-green-700 border-t-transparent mr-1"></div>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5" />
+                        Upload Plan
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* --- END NEW SECTION --- */}
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
             <div className="flex-1 relative">
@@ -543,7 +631,6 @@ const toggleSelectAll = () => {
             </div>
           </div>
         </div>
-
         {/* Themes List */}
         <div className="space-y-4">
           {filteredThemes.length === 0 ? (
@@ -567,13 +654,12 @@ const toggleSelectAll = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                      onClick={() => handleAssignClick(theme)}
-                      className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-all"
-                      title="Assign as Quiz"
+                        onClick={() => handleAssignClick(theme)}
+                        className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-all"
+                        title="Assign as Quiz"
                       >
-                      <Send className="w-5 h-5 text-white" />
+                        <Send className="w-5 h-5 text-white" />
                       </button>
-
                       <button
                         onClick={() => handleOpenModal(theme)}
                         className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-all"
@@ -589,7 +675,6 @@ const toggleSelectAll = () => {
                     </div>
                   </div>
                 </div>
-
                 {/* Theme Info */}
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -612,7 +697,6 @@ const toggleSelectAll = () => {
                       )}
                     </button>
                   </div>
-
                   {/* Word List */}
                   {expandedTheme === theme.id && (
                     <div className="mt-4 space-y-2 border-t pt-4">
@@ -652,7 +736,6 @@ const toggleSelectAll = () => {
                 <X className="w-6 h-6 text-gray-500" />
               </button>
             </div>
-
             {/* Modal Body */}
             <div className="p-6 space-y-6">
               {/* Basic Info */}
@@ -669,7 +752,6 @@ const toggleSelectAll = () => {
                     className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Description *
@@ -682,7 +764,6 @@ const toggleSelectAll = () => {
                     className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -698,7 +779,6 @@ const toggleSelectAll = () => {
                       ))}
                     </select>
                   </div>
-
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Icon Emoji
@@ -713,7 +793,6 @@ const toggleSelectAll = () => {
                     />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Color Gradient
@@ -724,8 +803,8 @@ const toggleSelectAll = () => {
                         key={option.value}
                         onClick={() => setFormData({ ...formData, gradient: option.value })}
                         className={`h-12 rounded-lg ${option.preview} transition-all ${
-                          formData.gradient === option.value 
-                            ? 'ring-4 ring-blue-500 ring-offset-2' 
+                          formData.gradient === option.value
+                            ? 'ring-4 ring-blue-500 ring-offset-2'
                             : 'hover:scale-105'
                         }`}
                       />
@@ -733,7 +812,6 @@ const toggleSelectAll = () => {
                   </div>
                 </div>
               </div>
-
               {/* Word Management */}
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-4">
@@ -748,7 +826,6 @@ const toggleSelectAll = () => {
                     </button>
                   </div>
                 </div>
-
                 {/* AI Generator Section */}
                 {showAIGenerator && (
                   <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg space-y-3">
@@ -756,7 +833,6 @@ const toggleSelectAll = () => {
                       <Sparkles className="w-5 h-5" />
                       <h4 className="font-semibold">AI Word Generator for Grade 1</h4>
                     </div>
-                    
                     <div className="p-3 bg-purple-100 border border-purple-300 rounded-lg">
                       <p className="text-sm text-purple-900">
                         <strong>Theme:</strong> {formData.title || 'Not set yet'}
@@ -765,12 +841,11 @@ const toggleSelectAll = () => {
                         AI will generate words based on your theme title above. Make sure to fill in the theme title first!
                       </p>
                     </div>
-                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Word Count</label>
-                      <input 
-                        type="text" 
-                        value={aiCount} 
+                      <input
+                        type="text"
+                        value={aiCount}
                         onChange={e => {
                           const val = e.target.value.replace(/[^0-9]/g, '');
                           const num = parseInt(val) || 0;
@@ -783,7 +858,6 @@ const toggleSelectAll = () => {
                       />
                       <p className="text-xs text-gray-500 mt-1">Enter a number between 5 and 30</p>
                     </div>
-
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Custom Prompt (Optional)</label>
                       <textarea
@@ -794,13 +868,11 @@ const toggleSelectAll = () => {
                         className="w-full px-3 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none text-sm"
                       />
                     </div>
-
                     {aiError && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                         {aiError}
                       </div>
                     )}
-
                     <button
                       onClick={() => generateWithAI(aiCustomPrompt)}
                       disabled={aiLoading || !formData.title.trim()}
@@ -820,7 +892,6 @@ const toggleSelectAll = () => {
                     </button>
                   </div>
                 )}
-                
                 {/* Bulk Import Section */}
                 <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                   <h4 className="text-sm font-semibold text-blue-900 mb-2">Bulk Import Words</h4>
@@ -858,7 +929,6 @@ const toggleSelectAll = () => {
                     </button>
                   </div>
                 </div>
-
                 {/* Add/Edit Word Form */}
                 <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -893,7 +963,6 @@ const toggleSelectAll = () => {
                     Add Word
                   </button>
                 </div>
-
                 {/* Word List */}
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {formData.words.length === 0 ? (
@@ -930,7 +999,6 @@ const toggleSelectAll = () => {
                 </div>
               </div>
             </div>
-
             {/* Modal Footer */}
             <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex items-center justify-end gap-3">
               <button
@@ -952,143 +1020,136 @@ const toggleSelectAll = () => {
       )}
 
       {/* Beautiful Assignment Modal */}
-{isAssignModalOpen && selectedTheme && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
-      {/* Header */}
-      <div 
-        className={`sticky top-0 bg-gradient-to-r ${selectedTheme.gradient} text-white p-6 rounded-t-2xl`}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Assign Quiz</h2>
-            <p className="text-purple-100">{`"${selectedTheme.title}"`}</p>
-          </div>
-          <button
-            onClick={() => setIsAssignModalOpen(false)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 overflow-hidden p-6">
-        {/* Search Bar */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search students by name or email..."
-            value={searchStudent}
-            onChange={(e) => setSearchStudent(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm"
-          />
-        </div>
-
-        {/* Select All */}
-        <div className="mb-4 flex items-center">
-        <input
-            type="checkbox"
-            checked={isAllFilteredSelected()}
-            onChange={toggleSelectAll}
-            className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
-            id="select-all"
-        />
-        <label htmlFor="select-all" className="ml-2 font-medium text-gray-700">
-             Select all {searchStudent ? 'filtered' : ''} students (
-            {students.filter(s => 
-                !alreadyAssigned.has(s.id) && 
-                (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
-            ).length}
-            )
-        </label>
-        </div>
-
-        {/* Student List */}
-        <div className="space-y-2 max-h-96 overflow-y-auto pr-2 pb-14">
-        {(() => {
-            const filteredStudents = students.filter(s => 
-            !alreadyAssigned.has(s.id) && 
-            (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
-            );
-
-            return (
-            <div>
-                {/* Show count of visible/assignable students */}
-                <div className="text-sm text-gray-600 mb-2">
-                Showing {filteredStudents.length} of {students.length} students
-                </div>
-
-                {filteredStudents.length > 0 ? (
-                filteredStudents.map(student => (
-                    <div
-                    key={student.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200"
-                    >
-                    <div>
-                        <div className="font-semibold text-gray-900">
-                        {student.name || 'Unnamed Student'}
-                        </div>
-                        <div className="text-sm text-gray-500">{student.email}</div>
-                    </div>
-                    <input
-                        type="checkbox"
-                        checked={selectedStudentIds.has(student.id)}
-                        onChange={() => toggleStudent(student.id)}
-                        className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
-                    />
-                    </div>
-                ))
-                ) : (
-                <p className="text-center text-gray-500 py-4">
-                    {searchStudent 
-                    ? 'No students match your search.' 
-                    : 'All students are already assigned to this quiz.'}
-                </p>
-                )}
-            </div>
-            );
-        })()}
-        </div>
-
-        {students.length === 0 && (
-          <p className="text-center text-gray-500 py-4">No students found.</p>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            {selectedStudentIds.size} of {
-                students.filter(s => 
-                !alreadyAssigned.has(s.id) && 
-                (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
-                ).length
-            } students selected
-            </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setIsAssignModalOpen(false)}
-              className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+      {isAssignModalOpen && selectedTheme && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div
+              className={`sticky top-0 bg-gradient-to-r ${selectedTheme.gradient} text-white p-6 rounded-t-2xl`}
             >
-              Cancel
-            </button>
-            <button
-                onClick={handleAssignSubmit} // ✅ clean and simple
-                disabled={selectedStudentIds.size === 0}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Assign Quiz</h2>
+                  <p className="text-purple-100">{`"${selectedTheme.title}"`}</p>
+                </div>
+                <button
+                  onClick={() => setIsAssignModalOpen(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
                 >
-                Assign Quiz ({selectedStudentIds.size})
-            </button>
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-hidden p-6">
+              {/* Search Bar */}
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search students by name or email..."
+                  value={searchStudent}
+                  onChange={(e) => setSearchStudent(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm"
+                />
+              </div>
+              {/* Select All */}
+              <div className="mb-4 flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isAllFilteredSelected()}
+                  onChange={toggleSelectAll}
+                  className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                  id="select-all"
+                />
+                <label htmlFor="select-all" className="ml-2 font-medium text-gray-700">
+                  Select all {searchStudent ? 'filtered' : ''} students (
+                  {students.filter(s =>
+                    !alreadyAssigned.has(s.id) &&
+                    (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+                  ).length}
+                  )
+                </label>
+              </div>
+              {/* Student List */}
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-2 pb-14">
+                {(() => {
+                  const filteredStudents = students.filter(s =>
+                    !alreadyAssigned.has(s.id) &&
+                    (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+                  );
+                  return (
+                    <div>
+                      {/* Show count of visible/assignable students */}
+                      <div className="text-sm text-gray-600 mb-2">
+                        Showing {filteredStudents.length} of {students.length} students
+                      </div>
+                      {filteredStudents.length > 0 ? (
+                        filteredStudents.map(student => (
+                          <div
+                            key={student.id}
+                            className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200"
+                          >
+                            <div>
+                              <div className="font-semibold text-gray-900">
+                                {student.name || 'Unnamed Student'}
+                              </div>
+                              <div className="text-sm text-gray-500">{student.email}</div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.has(student.id)}
+                              onChange={() => toggleStudent(student.id)}
+                              className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-500 py-4">
+                          {searchStudent
+                            ? 'No students match your search.'
+                            : 'All students are already assigned to this quiz.'}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              {students.length === 0 && (
+                <p className="text-center text-gray-500 py-4">No students found.</p>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="border-t border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  {selectedStudentIds.size} of {
+                    students.filter(s =>
+                      !alreadyAssigned.has(s.id) &&
+                      (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
+                    ).length
+                  } students selected
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsAssignModalOpen(false)}
+                    className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAssignSubmit} // ✅ clean and simple
+                    disabled={selectedStudentIds.size === 0}
+                    className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Assign Quiz ({selectedStudentIds.size})
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }
