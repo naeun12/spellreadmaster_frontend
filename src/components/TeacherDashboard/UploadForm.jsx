@@ -38,7 +38,7 @@ const UploadForm = () => {
           const idToken = await auth.currentUser.getIdToken();
           
           // Send the student data to the backend
-          const response = await fetch('https://spellreadmasterfrontend-production.up.railway.app/api/admin/create-students', {
+          const response = await fetch('https://spellread-master-production.up.railway.app/api/admin/create-students', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
