@@ -1,9 +1,9 @@
 // src/api.js
-import { auth } from './firebase'; // Import the correctly initialized auth instance
-import { getIdToken } from 'firebase/auth'; // Import getIdToken function
+import { auth } from './firebase';
+import { getIdToken } from 'firebase/auth';
 
-// Backend URL - Change this to your production URL when deploying
-const BACKEND_URL ='http://spellread-master-production.up.railway.app';
+// ✅ FIXED: Use localhost:5000 for development
+const BACKEND_URL = 'http://localhost:5000';
 
 /**
  * Makes an authenticated API call to your backend.
@@ -17,8 +17,7 @@ export async function authenticatedFetch(url, options = {}) {
   // getIdToken handles token refresh automatically
   const token = await getIdToken(auth.currentUser);
 
-  // Log the token for debugging (optional, can remove in production)
-  console.log("Token being sent:", token);
+  console.log("🔑 Sending request to:", url);
 
   const authenticatedOptions = {
     ...options,
@@ -29,14 +28,22 @@ export async function authenticatedFetch(url, options = {}) {
     },
   };
 
-  const response = await fetch(url, authenticatedOptions);
+  try {
+    const response = await fetch(url, authenticatedOptions);
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Response error:', errorData);
+      throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Response received:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Fetch error:', error);
+    throw error;
   }
-
-  return response.json();
 }
 
 // =======================
@@ -45,7 +52,6 @@ export async function authenticatedFetch(url, options = {}) {
 
 /**
  * Add a new word to the backend WordBank
- * @param {Object} wordData - Word details
  */
 export async function addWord(wordData) {
   return authenticatedFetch(`${BACKEND_URL}/word/add-word`, {
@@ -55,18 +61,46 @@ export async function addWord(wordData) {
 }
 
 /**
- * Fetch student dashboard data (example)
+ * Edit an existing word
  */
-export async function getStudentDashboard() {
-  return authenticatedFetch(`${BACKEND_URL}/api/student/dashboard`, {
+export async function editWord(wordId, wordData) {
+  return authenticatedFetch(`${BACKEND_URL}/word/edit-word/${wordId}`, {
+    method: 'PUT',
+    body: JSON.stringify(wordData),
+  });
+}
+
+/**
+ * Get quiz for a specific level
+ */
+export async function getQuiz(level) {
+  return authenticatedFetch(`${BACKEND_URL}/quiz/get-quiz/${level}`, {
     method: 'GET',
   });
 }
 
 /**
+ * Submit quiz results
+ */
+export async function submitQuiz(level, submissionData) {
+  return authenticatedFetch(`${BACKEND_URL}/quiz/submit-quiz/${level}`, {
+    method: 'POST',
+    body: JSON.stringify(submissionData),
+  });
+}
+
+/**
+ * Generate levels
+ */
+export async function generateLevels(data) {
+  return authenticatedFetch(`${BACKEND_URL}/quiz/generate-levels`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
  * Create multiple students via backend (for CSV upload)
- * @param {string} teacherId - The teacher's Firebase UID
- * @param {Array} students - Array of student objects
  */
 export async function createStudents(teacherId, students) {
   return authenticatedFetch(`${BACKEND_URL}/api/admin/create-batch-students`, {
@@ -77,5 +111,3 @@ export async function createStudents(teacherId, students) {
     }),
   });
 }
-
-// You can add more functions here as needed, following the same pattern.

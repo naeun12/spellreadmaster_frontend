@@ -1,6 +1,6 @@
 // src/components/Teacher/ManageTLM.jsx
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../../firebase'; // Keep db import if needed elsewhere
+import { db, auth } from '../../firebase';
 import {
   collection,
   getDocs,
@@ -13,28 +13,54 @@ import {
   deleteDoc,
   arrayUnion,
   writeBatch,
-  // Removed getDoc, setDoc imports as they are not needed for this part
+  getDoc,
 } from 'firebase/firestore';
-// --- NEW IMPORTS START ---
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { File, Download, Upload } from 'lucide-react'; // Added File and Download icons
-// --- NEW IMPORTS END ---
-import { Puzzle, Plus, Edit2, Trash2, Save, X, Search, Filter, ChevronDown, ChevronUp, Wand2, Sparkles, Send } from 'lucide-react';
+import { File, Download, Upload, Trash2 } from 'lucide-react';
+import { Puzzle, Plus, Edit2, Save, X, Search, Filter, ChevronDown, ChevronUp, Wand2, Sparkles, Send } from 'lucide-react';
 
 export default function ManageTLM() {
   const [themes, setThemes] = useState([]);
   const [loadingThemes, setLoadingThemes] = useState(true);
-
-  // --- NEW STATE FOR TEACHER'S LESSON PLAN START ---
-  // We will store the URL and name only for the currently loaded/last uploaded file
-  // They will not be persisted in Firestore by this component anymore
   const [lessonPlanUrl, setLessonPlanUrl] = useState('');
   const [lessonPlanName, setLessonPlanName] = useState('');
-  const [uploadingLessonPlan, setUploadingLessonPlan] = useState(false); // Single state for overall upload status
-  // --- NEW STATE FOR TEACHER'S LESSON PLAN END ---
-
-  // Firestore CRUD functions for themes
-  // ... (existing createTheme, updateTheme, deleteTheme functions remain the same)
+  const [uploadingLessonPlan, setUploadingLessonPlan] = useState(false);
+  const [deletingLessonPlan, setDeletingLessonPlan] = useState(false);
+  const [downloadingPlan, setDownloadingPlan] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTheme, setEditingTheme] = useState(null);
+  const [expandedTheme, setExpandedTheme] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterDifficulty, setFilterDifficulty] = useState('All');
+  const [bulkInput, setBulkInput] = useState('');
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+  const [searchStudent, setSearchStudent] = useState('');
+  const [students, setStudents] = useState([]);
+  const [alreadyAssigned, setAlreadyAssigned] = useState(new Set());
+  const [formData, setFormData] = useState({
+    title: '',
+    difficulty: 'Easy',
+    gradient: 'from-blue-500 to-indigo-500',
+    icon: '📚',
+    description: '',
+    words: []
+  });
+  const [wordInput, setWordInput] = useState({ word: '', sampleSentence: '', image: '' });
+  const [aiCount, setAiCount] = useState(15);
+  const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+  const gradientOptions = [
+    { value: 'from-blue-500 to-indigo-500', label: 'Blue', preview: 'bg-gradient-to-r from-blue-500 to-indigo-500' },
+    { value: 'from-purple-500 to-pink-500', label: 'Purple', preview: 'bg-gradient-to-r from-purple-500 to-pink-500' },
+    { value: 'from-green-500 to-emerald-500', label: 'Green', preview: 'bg-gradient-to-r from-green-500 to-emerald-500' },
+    { value: 'from-orange-500 to-red-500', label: 'Orange', preview: 'bg-gradient-to-r from-orange-500 to-red-500' },
+    { value: 'from-cyan-500 to-teal-500', label: 'Cyan', preview: 'bg-gradient-to-r from-cyan-500 to-teal-500' },
+    { value: 'from-pink-500 to-rose-500', label: 'Pink', preview: 'bg-gradient-to-r from-pink-500 to-rose-500' }
+  ];
+  const difficultyOptions = ['Easy', 'Medium', 'Hard'];
 
   useEffect(() => {
     const loadTeacherData = async () => {
@@ -42,43 +68,44 @@ export default function ManageTLM() {
       if (!teacherId) return;
       setLoadingThemes(true);
       try {
-        // Fetch ONLY themes created by this teacher
         const themesQuery = query(collection(db, 'themes'), where('createdBy', '==', teacherId));
         const themesSnap = await getDocs(themesQuery);
         const themeList = themesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Fetch students assigned to this teacher
         const studentsQuery = query(collection(db, 'students'), where('teacherId', '==', teacherId));
         const studentsSnap = await getDocs(studentsQuery);
         const studentList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
         setThemes(themeList);
         setStudents(studentList);
-
-        // --- REMOVED: Fetch teacher's lesson plan data from subcollection ---
-        // This section is removed because we are no longer storing metadata in Firestore
-        // --- END REMOVED SECTION ---
+        const teacherDocRef = doc(db, 'teachers', teacherId);
+        const teacherDocSnap = await getDoc(teacherDocRef);
+        if (teacherDocSnap.exists()) {
+          const teacherData = teacherDocSnap.data();
+          setLessonPlanUrl(teacherData.lessonPlanUrl || '');
+          setLessonPlanName(teacherData.lessonPlanName || '');
+        } else {
+           console.warn("Teacher document not found for UID:", teacherId);
+        }
       } catch (error) {
-        console.error("Error loading teacher data:", error); // Improved error message
+        console.error("Error loading teacher data:", error);
         alert('Failed to load your data.');
       } finally {
         setLoadingThemes(false);
       }
     };
-
     loadTeacherData();
-  }, []); // Dependencies removed as loadTeacherData is defined inside useEffect
+  }, []);
 
   const createTheme = async (theme) => {
     try {
       const newTheme = {
         ...theme,
         createdBy: auth.currentUser.uid,
-        creatorRole: 'teacher' // ← important!
+        creatorRole: 'teacher'
       };
       const docRef = await addDoc(collection(db, 'themes'), newTheme);
       setThemes(prev => [...prev, { ...newTheme, id: docRef.id }]);
-    } catch (error) { // Added error parameter
-      console.error("Create theme error:", error); // Log error for debugging
+    } catch (error) {
+      console.error("Create theme error:", error);
       alert('Failed to create theme.');
     }
   };
@@ -93,8 +120,8 @@ export default function ManageTLM() {
       };
       await updateDoc(doc(db, 'themes', id), updated);
       setThemes(prev => prev.map(t => t.id === id ? { ...updated, id } : t));
-    } catch (error) { // Added error parameter
-      console.error("Update theme error:", error); // Log error for debugging
+    } catch (error) {
+      console.error("Update theme error:", error);
       alert('Failed to update theme.');
     }
   };
@@ -103,57 +130,13 @@ export default function ManageTLM() {
     try {
       await deleteDoc(doc(db, 'themes', id));
       setThemes(prev => prev.filter(t => t.id !== id));
-    } catch (error) { // Added error parameter
-      console.error("Delete theme error:", error); // Log error for debugging
+    } catch (error) {
+      console.error("Delete theme error:", error);
       alert('Failed to delete theme.');
     }
   };
 
-  // ... (existing state declarations remain the same)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTheme, setEditingTheme] = useState(null);
-  const [expandedTheme, setExpandedTheme] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterDifficulty, setFilterDifficulty] = useState('All');
-  const [bulkInput, setBulkInput] = useState('');
-  const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState(null);
-  const [selectedStudentIds, setSelectedStudentIds] = useState(new Set()); // Set for fast lookup
-  const [searchStudent, setSearchStudent] = useState('');
-  const [students, setStudents] = useState([]); // to store teacher's students
-  const [alreadyAssigned, setAlreadyAssigned] = useState(new Set());
-  const [setFilteredStudentsCount] = useState(0);
-  const [formData, setFormData] = useState({
-    title: '',
-    difficulty: 'Easy',
-    gradient: 'from-blue-500 to-indigo-500',
-    icon: '📚',
-    description: '',
-    words: []
-  });
-  const [wordInput, setWordInput] = useState({ word: '', definition: '', image: '' });
-
-  // AI Generation state
-  const [aiCount, setAiCount] = useState(15);
-  const [aiCustomPrompt, setAiCustomPrompt] = useState('');
-
-  const gradientOptions = [
-    { value: 'from-blue-500 to-indigo-500', label: 'Blue', preview: 'bg-gradient-to-r from-blue-500 to-indigo-500' },
-    { value: 'from-purple-500 to-pink-500', label: 'Purple', preview: 'bg-gradient-to-r from-purple-500 to-pink-500' },
-    { value: 'from-green-500 to-emerald-500', label: 'Green', preview: 'bg-gradient-to-r from-green-500 to-emerald-500' },
-    { value: 'from-orange-500 to-red-500', label: 'Orange', preview: 'bg-gradient-to-r from-orange-500 to-red-500' },
-    { value: 'from-cyan-500 to-teal-500', label: 'Cyan', preview: 'bg-gradient-to-r from-cyan-500 to-teal-500' },
-    { value: 'from-pink-500 to-rose-500', label: 'Pink', preview: 'bg-gradient-to-r from-pink-500 to-rose-500' }
-  ];
-  const difficultyOptions = ['Easy', 'Medium', 'Hard'];
-
-  // ... (existing handleAssignClick, handleAssignSubmit, toggleStudent, toggleSelectAll, isAllFilteredSelected, etc. remain the same)
-
   const handleAssignClick = async (theme) => {
-    // Get current assignments for this theme
     const assignmentsRef = collection(db, 'assignments');
     const q = query(
       assignmentsRef,
@@ -167,7 +150,7 @@ export default function ManageTLM() {
       data.studentIds.forEach(id => alreadyAssignedStudentIds.add(id));
     });
     setSelectedTheme(theme);
-    setAlreadyAssigned(alreadyAssignedStudentIds); // new state
+    setAlreadyAssigned(alreadyAssignedStudentIds);
     setSelectedStudentIds(new Set());
     setSearchStudent('');
     setIsAssignModalOpen(true);
@@ -180,7 +163,6 @@ export default function ManageTLM() {
     }
     const batch = writeBatch(db);
     const studentIdArray = Array.from(selectedStudentIds);
-    // 1. Create assignment record (for teacher tracking)
     batch.set(doc(collection(db, 'assignments')), {
       themeId: selectedTheme.id,
       teacherId: auth.currentUser.uid,
@@ -188,7 +170,6 @@ export default function ManageTLM() {
       assignedAt: serverTimestamp(),
       status: 'assigned'
     });
-    // 2. Add themeId to each student's assignedThemeIds
     studentIdArray.forEach(studentId => {
       batch.update(doc(db, 'students', studentId), {
         assignedThemeIds: arrayUnion(selectedTheme.id)
@@ -198,14 +179,13 @@ export default function ManageTLM() {
       await batch.commit();
       alert('Quiz assigned successfully!');
       setIsAssignModalOpen(false);
-      setSelectedStudentIds(new Set()); // reset selection
+      setSelectedStudentIds(new Set());
     } catch (err) {
       console.error('Assignment error:', err);
       alert('Failed to assign quiz.');
     }
   };
 
-  // Toggle a single student
   const toggleStudent = (studentId) => {
     const newSet = new Set(selectedStudentIds);
     if (newSet.has(studentId)) {
@@ -216,13 +196,11 @@ export default function ManageTLM() {
     setSelectedStudentIds(newSet);
   };
 
-  // Toggle "Select All" (only for filtered students)
   const toggleSelectAll = () => {
     const filteredStudents = students.filter(s =>
       !alreadyAssigned.has(s.id) &&
       (s.name || s.email || '').toLowerCase().includes(searchStudent.toLowerCase())
     );
-    setFilteredStudentsCount(filteredStudents.length);
     const allSelected = filteredStudents.every(s => selectedStudentIds.has(s.id));
     const newSet = new Set(selectedStudentIds);
     if (allSelected) {
@@ -233,7 +211,6 @@ export default function ManageTLM() {
     setSelectedStudentIds(newSet);
   };
 
-  // Check if "Select All" should be checked
   const isAllFilteredSelected = () => {
     const filteredStudents = students.filter(s =>
       !alreadyAssigned.has(s.id) &&
@@ -241,8 +218,6 @@ export default function ManageTLM() {
     );
     return filteredStudents.length > 0 && filteredStudents.every(s => selectedStudentIds.has(s.id));
   };
-
-  // ... (existing handleOpenModal, handleCloseModal, handleAddWord, handleRemoveWord, handleWordChange, handleBulkImport, handleCSVImport, generateWithAI, parseAIResponse, handleSaveTheme, handleDeleteTheme, filteredThemes logic remain the same)
 
   const handleOpenModal = (theme = null) => {
     if (theme) {
@@ -275,19 +250,19 @@ export default function ManageTLM() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingTheme(null);
-    setWordInput({ word: '', definition: '', image: '' });
+    setWordInput({ word: '', sampleSentence: '', image: '' });
     setBulkInput('');
     setShowAIGenerator(false);
     setAiError('');
   };
 
   const handleAddWord = () => {
-    if (wordInput.word.trim() && wordInput.definition.trim()) {
+    if (wordInput.word.trim() && wordInput.sampleSentence.trim()) {
       setFormData({
         ...formData,
         words: [...formData.words, { ...wordInput }]
       });
-      setWordInput({ word: '', definition: '', image: '' });
+      setWordInput({ word: '', sampleSentence: '', image: '' });
     }
   };
 
@@ -314,7 +289,7 @@ export default function ManageTLM() {
         if (parts.length >= 2) {
           return {
             word: parts[0],
-            definition: parts[1],
+            sampleSentence: parts[1],
             image: parts[2] || ''
           };
         }
@@ -336,7 +311,7 @@ export default function ManageTLM() {
       const text = event.target.result;
       const lines = text.split('\n');
       const startIndex = lines[0].toLowerCase().includes('word') ||
-        lines[0].toLowerCase().includes('definition') ? 1 : 0;
+        lines[0].toLowerCase().includes('sample sentence') ? 1 : 0;
       const newWords = [];
       for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -360,7 +335,7 @@ export default function ManageTLM() {
         if (cleanParts.length >= 2 && cleanParts[0] && cleanParts[1]) {
           newWords.push({
             word: cleanParts[0],
-            definition: cleanParts[1]
+            sampleSentence: cleanParts[1]
           });
         }
       }
@@ -385,7 +360,7 @@ export default function ManageTLM() {
       return;
     }
     const prompt = customPrompt ||
-      `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${formData.title || 'general vocabulary'}". For each word, provide a very simple definition that a 6-year-old can understand. Format as: word, definition (one per line). Only return the word list, no additional text.`;
+      `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${formData.title || 'general vocabulary'}". For each word, provide a very simple sample sentence that a 6-year-old can understand (e.g., "I eat an apple."). Format as: word, sample sentence (one per line). Only return the word list, no additional text.`;
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
@@ -427,19 +402,19 @@ export default function ManageTLM() {
         if (match) {
           return {
             word: match[1].trim(),
-            definition: match[2].trim()
+            sampleSentence: match[2].trim()
           };
         }
         const parts = line.split(/[,|\t]/).map(p => p.trim());
         if (parts.length >= 2) {
           return {
             word: parts[0].replace(/^[0-9.)\s-]+/, '').trim(),
-            definition: parts[1].trim()
+            sampleSentence: parts[1].trim()
           };
         }
         return null;
       })
-      .filter(item => item && item.word && item.definition);
+      .filter(item => item && item.word && item.sampleSentence);
   };
 
   const handleSaveTheme = async () => {
@@ -468,70 +443,138 @@ export default function ManageTLM() {
     return matchesSearch && matchesDifficulty;
   });
 
-  // --- NEW: Upload Teacher's Lesson Plan Function (Updated - No Firestore) ---
+  // --- UPDATED UPLOAD FUNCTION ---
   const uploadTeacherLessonPlan = async (file) => {
     if (!file) return;
-
-    const storage = getStorage(); // Initialize storage
-    setUploadingLessonPlan(true); // Set overall loading state
-
+    const CLOUD_NAME = 'dleug1joa';
+    const UPLOAD_PRESET = 'teacher_lesson_plan';
+    setUploadingLessonPlan(true);
+    let fileNameWithoutExt = file.name;
+    if (fileNameWithoutExt.toLowerCase().endsWith('.pdf')) {
+      fileNameWithoutExt = fileNameWithoutExt.slice(0, -4);
+    }
+    const sanitizedFileName = fileNameWithoutExt.replace(/[^\w.-]/g, '_');
+    const finalFileName = sanitizedFileName;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    const publicId = `lessonPlans/${auth.currentUser.uid}/${finalFileName}`;
+    formData.append('public_id', publicId);
     try {
-      // Create a reference to the file location (e.g., lessonPlans/teacherId/filename)
-      const fileName = `${auth.currentUser.uid}/${file.name}`;
-      const fileRef = storageRef(storage, `lessonPlans/${fileName}`);
-
-      // Upload the file
-      const snapshot = await uploadBytes(fileRef, file);
-      console.log('Uploaded teacher lesson plan:', snapshot);
-
-      // Get the download URL
-      const downloadURL = await getDownloadURL(snapshot.ref);
-
-      // Update local state to show the newly uploaded file
-      setLessonPlanUrl(downloadURL);
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Cloudinary error response:', errorData);
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('Uploaded teacher lesson plan to Cloudinary:', data);
+      const cloudinaryUrl = data.secure_url;
+      const teacherDocRef = doc(db, 'teachers', auth.currentUser.uid);
+      await updateDoc(teacherDocRef, {
+        lessonPlanUrl: cloudinaryUrl,
+        lessonPlanName: file.name
+      });
+      setLessonPlanUrl(cloudinaryUrl);
       setLessonPlanName(file.name);
-
-      alert('Teacher lesson plan uploaded successfully!');
+      alert('Teacher lesson plan uploaded and saved successfully!');
     } catch (error) {
-      console.error("Error uploading teacher lesson plan:", error);
+      console.error("Error uploading teacher lesson plan to Cloudinary:", error);
       alert(`Failed to upload lesson plan: ${error.message}`);
     } finally {
-      setUploadingLessonPlan(false); // Reset loading state
+      setUploadingLessonPlan(false);
     }
   };
+  // --- END UPDATED UPLOAD FUNCTION ---
 
-  // --- NEW: Handle File Input Change for Teacher's Plan ---
   const handleTeacherLessonPlanFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       uploadTeacherLessonPlan(file);
     }
-    e.target.value = ''; // Reset input to allow re-uploading the same file
+    e.target.value = '';
   };
 
-  // --- NEW: Handle Download for Teacher's Plan ---
-  const handleDownloadTeacherPlan = () => {
-    if (lessonPlanUrl) {
-      // Create a temporary link element
-      const link = document.createElement('a');
-      link.href = lessonPlanUrl;
-      link.download = lessonPlanName || 'teacher_lesson_plan'; // Use stored filename or default
-      document.body.appendChild(link); // Append to the body (required for Firefox)
-      link.click(); // Programmatically click the link
-      document.body.removeChild(link); // Remove the link after clicking
-    } else {
+  // --- UPDATED DOWNLOAD FUNCTION ---
+  const handleDownloadTeacherPlan = async () => {
+    if (!lessonPlanUrl) {
       console.error("No teacher lesson plan URL found.");
       alert("No lesson plan file found for download.");
+      return;
+    }
+    setDownloadingPlan(true);
+    try {
+      let downloadUrl = lessonPlanUrl;
+      if (downloadUrl.includes('/image/upload/') || downloadUrl.includes('/auto/upload/')) {
+          downloadUrl = downloadUrl.replace(
+              /(\/(image|auto)\/upload\/v\d+\/)(.*)/,
+              (match, uploadPart, type, pathPart) => `${uploadPart}fl_attachment/${pathPart}`
+          );
+      } else if (downloadUrl.includes('/raw/upload/')) {
+          downloadUrl = downloadUrl.replace(
+              /(\/raw\/upload\/v\d+\/)(.*)/,
+              (match, uploadPart, pathPart) => `${uploadPart}fl_attachment/${pathPart}`
+          );
+      }
+      console.log("Final download URL:", downloadUrl);
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        console.error("Fetch response:", response);
+        throw new Error(`Failed to fetch the file: ${response.status} ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = lessonPlanName || 'teacher_lesson_plan.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      window.open(lessonPlanUrl, '_blank');
+    } finally {
+      setDownloadingPlan(false);
+    }
+  };
+  // --- END UPDATED DOWNLOAD FUNCTION ---
+
+  const handleDeleteTeacherPlan = async () => {
+    if (!lessonPlanUrl) {
+      console.error("No teacher lesson plan URL found to delete.");
+      alert("No lesson plan file found to delete.");
+      return;
+    }
+    const confirmDelete = window.confirm("Are you sure you want to remove the link to this lesson plan file? The file will remain in Cloudinary.");
+    if (!confirmDelete) return;
+    setDeletingLessonPlan(true);
+    try {
+      const teacherDocRef = doc(db, 'teachers', auth.currentUser.uid);
+      await updateDoc(teacherDocRef, {
+        lessonPlanUrl: null,
+        lessonPlanName: null
+      });
+      setLessonPlanUrl('');
+      setLessonPlanName('');
+      alert('Lesson plan link removed successfully! You can now upload a new file.');
+    } catch (error) {
+      console.error("Error removing lesson plan link:", error);
+      alert(`Failed to remove lesson plan link: ${error.message}`);
+    } finally {
+      setDeletingLessonPlan(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] p-16 rounded-3xl overflow-hidden mt-14 shadow-sm">
+    <div className="min-h-screen bg-[#FDFBF7] p-16 rounded-3xl overflow-hidden mt-2 shadow-sm">
       <div className="max-w-7xl mx-auto">
         {loadingThemes && (
           <div className="text-center py-8 text-lg text-gray-500">Loading themes from database...</div>
         )}
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -551,35 +594,70 @@ export default function ManageTLM() {
               Create Theme
             </button>
           </div>
-          {/* --- NEW: Teacher Lesson Plan Upload/View Section --- */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4">
             <h2 className="text-xl font-bold text-gray-900 mb-3">Teacher Lesson Plan</h2>
             <div className="flex items-center gap-2">
               {lessonPlanUrl ? (
-                // If a plan URL is currently loaded in state, show download button
-                <button
-                  onClick={handleDownloadTeacherPlan}
-                  className="flex items-center gap-1 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors"
-                  title="Download Lesson Plan"
-                >
-                  <Download className="w-5 h-5" />
-                  Download Plan: {lessonPlanName}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadTeacherPlan}
+                    disabled={downloadingPlan}
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      downloadingPlan
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
+                    title="Download Lesson Plan"
+                  >
+                    {downloadingPlan ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-700 border-t-transparent mr-1"></div>
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        Download Plan: {lessonPlanName}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDeleteTeacherPlan}
+                    disabled={deletingLessonPlan}
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      deletingLessonPlan
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                    title="Delete Lesson Plan"
+                  >
+                    {deletingLessonPlan ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-red-700 border-t-transparent mr-1"></div>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-5 h-5" />
+                        Delete Plan
+                      </>
+                    )}
+                  </button>
+                </div>
               ) : (
-                // If no plan URL is in state, show upload button
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
-                    accept=".pdf,.doc,.docx,.txt,.ppt,.pptx" // Specify allowed file types
-                    id="teacher-lesson-plan-upload" // Unique ID
+                    accept=".pdf"
+                    id="teacher-lesson-plan-upload"
                     className="hidden"
-                    onChange={handleTeacherLessonPlanFileChange} // Call new handler
-                    disabled={uploadingLessonPlan} // Disable during upload
+                    onChange={handleTeacherLessonPlanFileChange}
+                    disabled={uploadingLessonPlan}
                   />
                   <button
                     type="button"
-                    onClick={() => document.getElementById('teacher-lesson-plan-upload').click()} // Trigger input click
-                    disabled={uploadingLessonPlan} // Disable during upload
+                    onClick={() => document.getElementById('teacher-lesson-plan-upload').click()}
+                    disabled={uploadingLessonPlan}
                     className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-colors ${
                       uploadingLessonPlan
                         ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
@@ -603,8 +681,6 @@ export default function ManageTLM() {
               )}
             </div>
           </div>
-          {/* --- END NEW SECTION --- */}
-          {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -631,7 +707,6 @@ export default function ManageTLM() {
             </div>
           </div>
         </div>
-        {/* Themes List */}
         <div className="space-y-4">
           {filteredThemes.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
@@ -640,7 +715,6 @@ export default function ManageTLM() {
           ) : (
             filteredThemes.map(theme => (
               <div key={theme.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                {/* Theme Header */}
                 <div className={`bg-gradient-to-r ${theme.gradient} p-6`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -675,7 +749,6 @@ export default function ManageTLM() {
                     </div>
                   </div>
                 </div>
-                {/* Theme Info */}
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
@@ -697,7 +770,6 @@ export default function ManageTLM() {
                       )}
                     </button>
                   </div>
-                  {/* Word List */}
                   {expandedTheme === theme.id && (
                     <div className="mt-4 space-y-2 border-t pt-4">
                       {theme.words.map((word, index) => (
@@ -707,7 +779,7 @@ export default function ManageTLM() {
                           </div>
                           <div className="flex-1">
                             <div className="font-semibold text-gray-900">{word.word}</div>
-                            <div className="text-sm text-gray-600">{word.definition}</div>
+                            <div className="text-sm text-gray-600">{word.sampleSentence}</div>
                           </div>
                         </div>
                       ))}
@@ -719,12 +791,9 @@ export default function ManageTLM() {
           )}
         </div>
       </div>
-
-      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
               <h2 className="text-2xl font-bold text-gray-900">
                 {editingTheme ? 'Edit Theme' : 'Create New Theme'}
@@ -736,9 +805,7 @@ export default function ManageTLM() {
                 <X className="w-6 h-6 text-gray-500" />
               </button>
             </div>
-            {/* Modal Body */}
             <div className="p-6 space-y-6">
-              {/* Basic Info */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -812,7 +879,6 @@ export default function ManageTLM() {
                   </div>
                 </div>
               </div>
-              {/* Word Management */}
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-900">Words ({formData.words.length})</h3>
@@ -826,7 +892,6 @@ export default function ManageTLM() {
                     </button>
                   </div>
                 </div>
-                {/* AI Generator Section */}
                 {showAIGenerator && (
                   <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg space-y-3">
                     <div className="flex items-center gap-2 text-purple-900 mb-2">
@@ -863,7 +928,7 @@ export default function ManageTLM() {
                       <textarea
                         value={aiCustomPrompt}
                         onChange={(e) => setAiCustomPrompt(e.target.value)}
-                        placeholder="e.g., Generate science vocabulary for beginners with simple definitions"
+                        placeholder="e.g., Generate science vocabulary for beginners with simple sample sentences"
                         rows="2"
                         className="w-full px-3 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none text-sm"
                       />
@@ -892,16 +957,15 @@ export default function ManageTLM() {
                     </button>
                   </div>
                 )}
-                {/* Bulk Import Section */}
                 <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                   <h4 className="text-sm font-semibold text-blue-900 mb-2">Bulk Import Words</h4>
                   <p className="text-xs text-blue-700 mb-3">
-                    Format: <code className="bg-blue-100 px-1 py-0.5 rounded">word, definition</code> (one per line)
+                    Format: <code className="bg-blue-100 px-1 py-0.5 rounded">word, sample sentence</code> (one per line)
                   </p>
                   <textarea
                     value={bulkInput}
                     onChange={(e) => setBulkInput(e.target.value)}
-                    placeholder="Example:&#10;apple, A round fruit&#10;ball, A round toy&#10;cat, A furry pet"
+                    placeholder="Example:&#10;apple, I eat an apple.&#10;ball, I play with a ball.&#10;cat, The cat is fluffy."
                     rows="4"
                     className="w-full px-3 py-2 text-black border border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none text-sm font-mono"
                   />
@@ -929,7 +993,6 @@ export default function ManageTLM() {
                     </button>
                   </div>
                 </div>
-                {/* Add/Edit Word Form */}
                 <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <input
@@ -941,9 +1004,9 @@ export default function ManageTLM() {
                     />
                     <input
                       type="text"
-                      value={wordInput.definition}
-                      onChange={(e) => setWordInput({ ...wordInput, definition: e.target.value })}
-                      placeholder="Definition"
+                      value={wordInput.sampleSentence}
+                      onChange={(e) => setWordInput({ ...wordInput, sampleSentence: e.target.value })}
+                      placeholder="Sample Sentence"
                       className="px-4 py-2 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                     <input
@@ -956,14 +1019,13 @@ export default function ManageTLM() {
                   </div>
                   <button
                     onClick={handleAddWord}
-                    disabled={!wordInput.word.trim() || !wordInput.definition.trim()}
+                    disabled={!wordInput.word.trim() || !wordInput.sampleSentence.trim()}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
                     Add Word
                   </button>
                 </div>
-                {/* Word List */}
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {formData.words.length === 0 ? (
                     <p className="text-center text-gray-500 py-4">No words added yet</p>
@@ -975,7 +1037,7 @@ export default function ManageTLM() {
                         </div>
                         <div className="flex-1">
                           <div className="font-semibold text-gray-900">{word.word}</div>
-                          <div className="text-sm text-gray-600">{word.definition}</div>
+                          <div className="text-sm text-gray-600">{word.sampleSentence}</div>
                           {word.image && (
                             <img src={word.image} alt={word.word} className="mt-2 w-16 h-16 object-contain rounded border" />
                           )}
@@ -999,7 +1061,6 @@ export default function ManageTLM() {
                 </div>
               </div>
             </div>
-            {/* Modal Footer */}
             <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex items-center justify-end gap-3">
               <button
                 onClick={handleCloseModal}
@@ -1018,12 +1079,9 @@ export default function ManageTLM() {
           </div>
         </div>
       )}
-
-      {/* Beautiful Assignment Modal */}
       {isAssignModalOpen && selectedTheme && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
-            {/* Header */}
             <div
               className={`sticky top-0 bg-gradient-to-r ${selectedTheme.gradient} text-white p-6 rounded-t-2xl`}
             >
@@ -1040,9 +1098,7 @@ export default function ManageTLM() {
                 </button>
               </div>
             </div>
-            {/* Body */}
             <div className="flex-1 overflow-hidden p-6">
-              {/* Search Bar */}
               <div className="relative mb-6">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -1053,7 +1109,6 @@ export default function ManageTLM() {
                   className="w-full pl-10 pr-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm"
                 />
               </div>
-              {/* Select All */}
               <div className="mb-4 flex items-center">
                 <input
                   type="checkbox"
@@ -1071,7 +1126,6 @@ export default function ManageTLM() {
                   )
                 </label>
               </div>
-              {/* Student List */}
               <div className="space-y-2 max-h-96 overflow-y-auto pr-2 pb-14">
                 {(() => {
                   const filteredStudents = students.filter(s =>
@@ -1080,7 +1134,6 @@ export default function ManageTLM() {
                   );
                   return (
                     <div>
-                      {/* Show count of visible/assignable students */}
                       <div className="text-sm text-gray-600 mb-2">
                         Showing {filteredStudents.length} of {students.length} students
                       </div>
@@ -1119,7 +1172,6 @@ export default function ManageTLM() {
                 <p className="text-center text-gray-500 py-4">No students found.</p>
               )}
             </div>
-            {/* Footer */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-600">
@@ -1138,7 +1190,7 @@ export default function ManageTLM() {
                     Cancel
                   </button>
                   <button
-                    onClick={handleAssignSubmit} // ✅ clean and simple
+                    onClick={handleAssignSubmit}
                     disabled={selectedStudentIds.size === 0}
                     className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >

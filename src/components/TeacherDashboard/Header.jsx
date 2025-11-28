@@ -1,3 +1,4 @@
+// src/components/Header.jsx (Teacher)
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
@@ -8,33 +9,46 @@ import ConfirmLogoutModal from '../ConfirmLogoutModal';
 const Header = () => {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
-  const [displayName, setDisplayName] = useState('Loading...');
 
-  // Fetch teacher name from 'teachers' collection
+  // ✅ Initialize from Firebase Auth to prevent flicker
+  const [displayName, setDisplayName] = useState(() => {
+    const user = auth.currentUser;
+    return user?.displayName || user?.email?.split('@')[0] || 'Teacher';
+  });
+
+  const [photoURL, setPhotoURL] = useState(() => {
+    const user = auth.currentUser;
+    return user?.photoURL || 'https://i.pravatar.cc/150?img=13';
+  });
+
   useEffect(() => {
-    const fetchTeacherName = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        setDisplayName('Guest');
-        return;
-      }
+    const user = auth.currentUser;
+    if (!user) {
+      setDisplayName('Guest');
+      setPhotoURL('https://i.pravatar.cc/150?img=13');
+      return;
+    }
 
+    const fetchTeacherData = async () => {
       try {
         const teacherDoc = await getDoc(doc(db, 'teachers', user.uid));
         if (teacherDoc.exists()) {
-          const name = teacherDoc.data().fullName;
-          setDisplayName(name || 'Teacher');
-        } else {
-          // Fallback if doc doesn't exist
-          setDisplayName(user.email?.split('@')[0] || 'Teacher');
+          const data = teacherDoc.data();
+          // ✅ Use 'fullName' — as you confirmed for teachers
+          setDisplayName(data.fullName || user.displayName || user.email?.split('@')[0] || 'Teacher');
+          // Sync photo if Firestore has it (should match Auth)
+          if (data.photoURL) {
+            setPhotoURL(data.photoURL);
+          }
         }
+        // If no doc, keep initial values from Auth → no flicker!
       } catch (error) {
-        console.error('Error fetching teacher name:', error);
-        setDisplayName('Teacher');
+        console.error('Error fetching teacher ', error);
+        // Don't reset state — keep current (smooth fallback)
       }
     };
 
-    fetchTeacherName();
+    fetchTeacherData();
   }, []);
 
   const handleLogout = () => {
@@ -55,16 +69,20 @@ const Header = () => {
       {/* Left Section */}
       <div className="flex items-center justify-start md:justify-center pl-3 w-14 md:w-64 h-14">
         <img
-          src="https://i.pravatar.cc/150?img=13"
-          alt=""
-          className="w-7 h-7 md:w-10 md:h-10 mr-2 rounded-md overflow-hidden"
+          src={photoURL}
+          alt="Profile"
+          className="w-7 h-7 md:w-10 md:h-10 mr-2 rounded-md object-cover"
+          onError={() => setPhotoURL('https://i.pravatar.cc/150?img=13')}
         />
-        <span className="hidden md:block ml-2">{displayName}</span>
+        {/* Name and Role */}
+        <div className="hidden md:block">
+          <div className="font-medium">{displayName}</div>
+          <div className="text-xs opacity-90">Teacher</div> {/* ← Role added here */}
+        </div>
       </div>
 
       {/* Right Section */}
       <div className="flex-1 flex justify-between items-center h-14 px-4">
-        {/* Logout */}
         <ul className="flex items-center space-x-4 ml-auto">
           <li>
             <div className="block w-px h-6 mx-3 bg-white"></div>

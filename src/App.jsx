@@ -12,12 +12,14 @@ import UploadStudents from './pages/UploadStudents';
 import MonitorStudents from './pages/MonitorStudents';
 import TeacherPendingPage from './pages/TeacherPendingPage';
 import TeacherTLM from './pages/TeacherTLM';
+import TeacherProfile from './components/TeacherDashboard/Profile';
 import AdminPage from './pages/AdminPage';
 import ManageStoryMode from './pages/ManageStoryMode';
 import ManageThematicLearningMode from './pages/ManageThematicLearningMode';
 import ManageLBLearningMode from './pages/ManageLBLearningMode';
 import AdminManageAccounts from './pages/AdminManageAccounts';
 import AdminMonitorStudentProgress from './pages/AdminMonitorStudentProgress';
+import AdminProfile from './components/AdminDashboard/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 import StudentPage from './pages/StudentPage';
 import StudentProgress from './pages/StudentProgress';
@@ -26,11 +28,14 @@ import StudentLBLMPage from './pages/StudentLBLMPage';
 import StudentTLMPage from './pages/StudentTLMPage';
 import StudentSMPage from './pages/StudentSMPage';
 import StudentProfile from './components/StudentDashboard/StudentProfile';
-import StudentLBLM from './components/StudentDashboard/StudentLBLM';
+
 
 // Layouts
 import HomeLayout from './components/Layout/HomeLayout';
 import MainLayout from './components/Layout/MainLayout';
+import TeacherLayout from './components/TeacherDashboard/TeacherLayout';
+import AdminLayout from './components/AdminDashboard/AdminLayout';
+import StudentLayout from './components/StudentDashboard/StudentLayout';
 
 
 const App = () => {
@@ -86,6 +91,20 @@ const App = () => {
           <ProtectedRoute allowedRoles={['teacher']}>
             <MainLayout>
               <TeacherTLM />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+            {/* Protected Teacher TLM Manager */}
+      <Route
+        path="/TeacherPage/profile"
+        element={
+          <ProtectedRoute allowedRoles={['teacher']}>
+            <MainLayout>
+              <TeacherLayout>
+                <TeacherProfile />
+              </TeacherLayout>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -189,6 +208,20 @@ const App = () => {
 
       {/* Protected Admin Monitor Student Progress */}
       <Route
+        path="/AdminPage/profile"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <MainLayout>
+              <AdminLayout>
+                <AdminProfile />
+              </AdminLayout>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      /> 
+
+            {/* Protected Admin Monitor Student Progress */}
+      <Route
         path="/AdminPage/monitor-student-progress"
         element={
           <ProtectedRoute allowedRoles={['admin']}>
@@ -267,10 +300,14 @@ const App = () => {
 
             {/* Protected Student Page - Profile */}
       <Route
-        path="/StudentPage/story-profile"
+        path="/StudentPage/student-profile"
         element={
           <ProtectedRoute allowedRoles={['student']}>
-              <StudentProfile />
+            <MainLayout>
+              <StudentLayout>
+                <StudentProfile />
+              </StudentLayout>
+            </MainLayout>
           </ProtectedRoute>
         }
       /> 

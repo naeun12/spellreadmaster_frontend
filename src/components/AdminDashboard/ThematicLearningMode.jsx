@@ -72,9 +72,6 @@ export default function ThematicLearningMode() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('All');
   const [bulkInput, setBulkInput] = useState('');
-  //const [showAIGenerator, setShowAIGenerator] = useState(false);
-  //const [aiLoading, setAiLoading] = useState(false);
-  //const [aiError, setAiError] = useState('');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -85,11 +82,7 @@ export default function ThematicLearningMode() {
     words: []
   });
 
-  const [wordInput, setWordInput] = useState({ word: '', definition: '', image: '' });
-
-  // AI Generation state
-  //const [aiCount, setAiCount] = useState(15);
-  //const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+  const [wordInput, setWordInput] = useState({ word: '', sampleSentence: '', image: '' });
 
   const gradientOptions = [
     { value: 'from-blue-500 to-indigo-500', label: 'Blue', preview: 'bg-gradient-to-r from-blue-500 to-indigo-500' },
@@ -125,27 +118,23 @@ export default function ThematicLearningMode() {
       });
     }
     setBulkInput('');
-    //setShowAIGenerator(false);
-    //setAiError('');
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingTheme(null);
-    setWordInput({ word: '', definition: '' });
+    setWordInput({ word: '', sampleSentence: '', image: '' });
     setBulkInput('');
-    //setShowAIGenerator(false);
-    //setAiError('');
   };
 
   const handleAddWord = () => {
-    if (wordInput.word.trim() && wordInput.definition.trim()) {
+    if (wordInput.word.trim() && wordInput.sampleSentence.trim()) {
       setFormData({
         ...formData,
         words: [...formData.words, { ...wordInput }]
       });
-      setWordInput({ word: '', definition: '', image: '' });
+      setWordInput({ word: '', sampleSentence: '', image: '' });
     }
   };
 
@@ -173,7 +162,7 @@ export default function ThematicLearningMode() {
         if (parts.length >= 2) {
           return {
             word: parts[0],
-            definition: parts[1],
+            sampleSentence: parts[1],
             image: parts[2] || ''
           };
         }
@@ -198,7 +187,7 @@ export default function ThematicLearningMode() {
       const lines = text.split('\n');
       
       const startIndex = lines[0].toLowerCase().includes('word') || 
-                        lines[0].toLowerCase().includes('definition') ? 1 : 0;
+                        lines[0].toLowerCase().includes('sample sentence') ? 1 : 0;
       
       const newWords = [];
       for (let i = startIndex; i < lines.length; i++) {
@@ -227,7 +216,7 @@ export default function ThematicLearningMode() {
         if (cleanParts.length >= 2 && cleanParts[0] && cleanParts[1]) {
           newWords.push({
             word: cleanParts[0],
-            definition: cleanParts[1]
+            sampleSentence: cleanParts[1]
           });
         }
       }
@@ -243,86 +232,6 @@ export default function ThematicLearningMode() {
     reader.readAsText(file);
     e.target.value = '';
   };
-
-  // const generateWithAI = async (customPrompt = '') => {
-  //   setAiLoading(true);
-  //   setAiError('');
-    
-  //   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  //   const BASE_URL = "https://googleapis.com/v1/models/gemini-2.5-flash";
-
-  //   const themeContext = formData.title || formData.description || 'general vocabulary';
-
-  //   const prompt = customPrompt || 
-  //     `Generate ${aiCount} simple words suitable for Grade 1 students related to the theme "${themeContext}". For each word, provide a very simple definition that a 6-year-old can understand. Format as: word, definition (one per line). Only return the word list, no additional text.`;
-    
-  //   try {
-  //     const response = await fetch(`${BASE_URL}/chat/completions`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': `Bearer ${API_KEY}`,
-  //         'HTTP-Referer': window.location.origin,
-  //         'X-Title': 'Theme Management App',
-  //       },
-  //       body: JSON.stringify({
-  //         model: "gemini-2.5-flash",
-  //         messages: [
-  //           {
-  //             role: "user",
-  //             content: prompt
-  //           }
-  //         ]
-  //       })
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-
-  //     const data = await response.json();
-  //     const text = data.choices[0].message.content;
-
-  //     const newWords = parseAIResponse(text);
-
-  //     if (newWords.length > 0) {
-  //       setFormData(prev => ({ ...prev, words: [...prev.words, ...newWords] }));
-  //       setShowAIGenerator(false);
-  //       alert(`Successfully generated ${newWords.length} words with AI!`);
-  //     } else {
-  //       throw new Error('Could not parse AI response into word list');
-  //     }
-  //   } catch (err) {
-  //     setAiError(`Error: ${err.message}`);
-  //   } finally {
-  //     setAiLoading(false);
-  //   }
-  // };
-
-  // const parseAIResponse = (text) => {
-  //   const lines = text.trim().split('\n');
-  //   return lines
-  //     .map(line => {
-  //       const match = line.match(/^[0-9.)\s-]*(.+?)[,:-]\s*(.+)$/);
-  //       if (match) {
-  //         return {
-  //           word: match[1].trim(),
-  //           definition: match[2].trim()
-  //         };
-  //       }
-
-  //       const parts = line.split(/[,|\t]/).map(p => p.trim());
-  //       if (parts.length >= 2) {
-  //         return {
-  //           word: parts[0].replace(/^[0-9.)\s-]+/, '').trim(),
-  //           definition: parts[1].trim()
-  //         };
-  //       }
-  //       return null;
-  //     })
-  //     .filter(item => item && item.word && item.definition);
-  // };
-
 
   const handleSaveTheme = async () => {
     if (!formData.title.trim() || formData.words.length === 0) {
@@ -476,7 +385,7 @@ export default function ThematicLearningMode() {
                           </div>
                           <div className="flex-1">
                             <div className="font-semibold text-gray-900">{word.word}</div>
-                            <div className="text-sm text-gray-600">{word.definition}</div>
+                            <div className="text-sm text-gray-600">{word.sampleSentence}</div>
                           </div>
                         </div>
                       ))}
@@ -591,99 +500,18 @@ export default function ThematicLearningMode() {
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-900">Words ({formData.words.length})</h3>
-                  <div className="flex gap-2">
-                    {/* <button
-                      onClick={() => setShowAIGenerator(!showAIGenerator)}
-                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all text-sm"
-                    >
-                      <Wand2 className="w-4 h-4" />
-                      AI Generate
-                    </button> */}
-                  </div>
                 </div>
-
-                AI Generator Section
-                {/* {showAIGenerator && (
-                  <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg space-y-3">
-                    <div className="flex items-center gap-2 text-purple-900 mb-2">
-                      <Sparkles className="w-5 h-5" />
-                      <h4 className="font-semibold">AI Word Generator for Grade 1</h4>
-                    </div>
-                    
-                    <div className="p-3 bg-purple-100 border border-purple-300 rounded-lg">
-                      <p className="text-sm text-purple-900">
-                        <strong>Theme:</strong> {formData.title || 'Not set yet'}
-                      </p>
-                      <p className="text-xs text-purple-700 mt-1">
-                        AI will generate words based on your theme title above. Make sure to fill in the theme title first!
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Word Count</label>
-                      <input 
-                        type="text" 
-                        value={aiCount} 
-                        onChange={e => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          const num = parseInt(val) || 0;
-                          if (num >= 0 && num <= 30) {
-                            setAiCount(num);
-                          }
-                        }}
-                        placeholder="Enter number (5-30)"
-                        className="w-full px-3 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-sm"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Enter a number between 5 and 30</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Custom Prompt (Optional)</label>
-                      <textarea
-                        value={aiCustomPrompt}
-                        onChange={(e) => setAiCustomPrompt(e.target.value)}
-                        placeholder="e.g., Generate science vocabulary for beginners with simple definitions"
-                        rows="2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none text-sm"
-                      />
-                    </div>
-
-                    {aiError && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                        {aiError}
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => generateWithAI(aiCustomPrompt)}
-                      disabled={aiLoading || !formData.title.trim()}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 transition-all disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed"
-                    >
-                      {aiLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 className="w-4 h-4" />
-                          {!formData.title.trim() ? 'Set Theme Title First' : 'Generate with AI'}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )} */}
                 
                 {/* Bulk Import Section */}
                 <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                   <h4 className="text-sm font-semibold text-blue-900 mb-2">Bulk Import Words</h4>
                   <p className="text-xs text-blue-700 mb-3">
-                    Format: <code className="bg-blue-100 px-1 py-0.5 rounded">word, definition</code> (one per line)
+                    Format: <code className="bg-blue-100 px-1 py-0.5 rounded">word, sample sentence</code> (one per line)
                   </p>
                   <textarea
                     value={bulkInput}
                     onChange={(e) => setBulkInput(e.target.value)}
-                    placeholder="Example:&#10;apple, A round fruit&#10;ball, A round toy&#10;cat, A furry pet"
+                    placeholder="Example:&#10;apple, I eat an apple.&#10;ball, I play with a ball.&#10;cat, The cat is fluffy."
                     rows="4"
                     className="w-full px-3 py-2 text-black border border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none text-sm font-mono"
                   />
@@ -724,9 +552,9 @@ export default function ThematicLearningMode() {
                     />
                     <input
                       type="text"
-                      value={wordInput.definition}
-                      onChange={(e) => setWordInput({ ...wordInput, definition: e.target.value })}
-                      placeholder="Definition"
+                      value={wordInput.sampleSentence}
+                      onChange={(e) => setWordInput({ ...wordInput, sampleSentence: e.target.value })}
+                      placeholder="Sample Sentence"
                       className="px-4 py-2 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                     <input
@@ -739,7 +567,7 @@ export default function ThematicLearningMode() {
                   </div>
                   <button
                     onClick={handleAddWord}
-                    disabled={!wordInput.word.trim() || !wordInput.definition.trim()}
+                    disabled={!wordInput.word.trim() || !wordInput.sampleSentence.trim()}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
@@ -759,7 +587,7 @@ export default function ThematicLearningMode() {
                         </div>
                         <div className="flex-1">
                           <div className="font-semibold text-gray-900">{word.word}</div>
-                          <div className="text-sm text-gray-600">{word.definition}</div>
+                          <div className="text-sm text-gray-600">{word.sampleSentence}</div>
                           {word.image && (
                             <img src={word.image} alt={word.word} className="mt-2 w-16 h-16 object-contain rounded border" />
                           )}

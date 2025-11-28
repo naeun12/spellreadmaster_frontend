@@ -1,253 +1,248 @@
-import React, { useState } from 'react';
-import { User, BookOpen, Award, Calendar, Mail, GraduationCap, TrendingUp, Target, Clock } from 'lucide-react';
+// src/components/StudentProfileSettings.jsx
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, CheckCircle, RefreshCw, Check } from 'lucide-react';
+import { updateProfile } from 'firebase/auth';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../../firebase';
 
-export default function StudentProfile() {
-  const [studentData] = useState({
-    name: "Danny Tianco",
-    parentEmail: "tianco@gmail.com",
-    role: "student",
-    section: "1A",
-    skillLevel: "developing",
-    startingLevel: 3,
-    currentLevel: 3,
-    studentId: "100023",
-    teacherId: "4xVxKPU6YDUZHqBusO0zbBioBJD3",
-    completedLevels: [1, 2],
-    weakAreas: ["phonics_level_1", "phonics_level_2", "phonics_level_3"],
-    firstLogin: true,
-    createdAt: "June 14, 2025 at 8:37:48 AM UTC+8",
-    lastUpdated: "November 14, 2025 at 12:32:22 PM UTC+8"
-  });
+const DICEBEAR_STYLE = 'fun-emoji';
+const DICEBEAR_SVG_URL = (seed) =>
+  `https://api.dicebear.com/7.x/${DICEBEAR_STYLE}/svg?seed=${encodeURIComponent(seed)}`;
 
-  const progressPercentage = (studentData.completedLevels.length / 10) * 100;
+const generateRandomSeed = () => Math.random().toString(36).substring(2, 10);
+
+export default function StudentProfileSettings() {
+  const [nickname, setNickname] = useState(''); // ✅ Changed to nickname
+  const [selectedSeed, setSelectedSeed] = useState('');
+  const [currentAvatars, setCurrentAvatars] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchingAvatars, setFetchingAvatars] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  const currentUser = auth.currentUser;
+  const navigate = useNavigate();
+
+  const generateAvatarBatch = async () => {
+    setFetchingAvatars(true);
+    const seeds = Array.from({ length: 8 }, generateRandomSeed);
+    const avatars = [];
+
+    for (const seed of seeds) {
+      try {
+        const res = await fetch(DICEBEAR_SVG_URL(seed));
+        const svg = await res.text();
+        avatars.push({ seed, svg });
+      } catch {
+        console.warn('Failed to load avatar for seed:', seed);
+      }
+    }
+
+    setCurrentAvatars(avatars);
+    if (!selectedSeed && avatars.length > 0) {
+      setSelectedSeed(avatars[0].seed);
+    }
+    setFetchingAvatars(false);
+  };
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const loadProfile = async () => {
+      try {
+        const studentDoc = doc(db, 'students', currentUser.uid);
+        const docSnap = await getDoc(studentDoc);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          // ✅ Load existing nickname (if any)
+          setNickname(data.nickname || '');
+        }
+        await generateAvatarBatch();
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+        setMessage({ type: 'error', text: 'Failed to load profile.' });
+        await generateAvatarBatch();
+      }
+    };
+
+    loadProfile();
+  }, [currentUser]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!currentUser || !nickname.trim() || !selectedSeed) return;
+
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const selectedAvatar = currentAvatars.find(a => a.seed === selectedSeed);
+      if (!selectedAvatar) throw new Error('Selected avatar not found');
+
+      const studentRef = doc(db, 'students', currentUser.uid);
+
+      // Optional: sync nickname to Auth displayName (for consistency)
+      await updateProfile(currentUser, {
+        displayName: nickname,
+        photoURL: DICEBEAR_SVG_URL(selectedSeed),
+      });
+
+      // ✅ Save nickname + raw SVG
+      await updateDoc(studentRef, {
+        nickname: nickname.trim(), // ← new field
+        avatar: selectedAvatar.svg,
+        seed: selectedSeed,
+      });
+
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setTimeout(() => {
+        navigate('/StudentPage');
+      }, 1000);
+    } catch (err) {
+      console.error('Update error:', err);
+      setMessage({
+        type: 'error',
+        text: err.message || 'Failed to update profile.',
+      });
+      setLoading(false);
+    }
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
+        <p className="text-red-600 text-xl">You must be logged in to access settings.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header Bar */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen text-black p-16 bg-[#FDFBF7] mt-22 rounded-3xl overflow-hidden shadow-sm">
+      <button
+        onClick={() => navigate('/StudentPage')}
+        className="mb-6 flex items-center gap-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-md px-6 py-3 transition-all shadow-md"
+      >
+        <ArrowLeft className="w-5 h-5" />
+        Back to Dashboard
+      </button>
+
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Pick Your Avatar</h1>
+          <p className="text-gray-600">Choose a fun emoji and set your nickname!</p>
+        </div>
+
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
+          {message.text && (
+            <div
+              className={`p-3 mb-5 rounded-lg flex items-center gap-2 ${
+                message.type === 'success'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
+              }`}
+            >
+              {message.type === 'success' && <CheckCircle className="w-5 h-5" />}
+              {message.text}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Nickname Field */}
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Student Profile</h1>
-              <p className="text-sm text-slate-500 mt-1">Academic Year 2025-2026</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">
-                ID: {studentData.studentId}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Main Profile Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-8 py-6">
-            <div className="flex items-start gap-6">
-              <div className="bg-white rounded-full p-4 shadow-lg">
-                <User className="w-12 h-12 text-slate-700" />
-              </div>
-              
-              <div className="flex-1 text-white">
-                <h2 className="text-3xl font-bold mb-2">{studentData.name}</h2>
-                <div className="flex items-center gap-6 text-slate-200">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    <span className="text-sm">{studentData.parentEmail}</span>
-                  </div>
-                  <div className="h-4 w-px bg-slate-500"></div>
-                  <span className="text-sm font-medium">Section {studentData.section}</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="px-5 py-2.5 rounded-lg border-2 bg-slate-100 text-slate-700 border-slate-300 font-semibold text-sm capitalize mb-2">
-                  {studentData.role}
-                </div>
-                <div className="px-5 py-2.5 rounded-lg border-2 bg-amber-50 text-amber-700 border-amber-200 font-semibold text-sm capitalize">
-                  {studentData.skillLevel}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Bar */}
-          <div className="grid grid-cols-4 border-t border-slate-200">
-            <div className="px-6 py-5 border-r border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Starting Level</p>
-                  <p className="text-2xl font-bold text-slate-900">{studentData.startingLevel}</p>
-                </div>
-              </div>
+              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
+                Nickname
+              </label>
+              <input
+                id="nickname"
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="e.g., Sparky, Luna, Max"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                This is how you will appear in the game!
+              </p>
             </div>
 
-            <div className="px-6 py-5 border-r border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Current Level</p>
-                  <p className="text-2xl font-bold text-slate-900">{studentData.currentLevel}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-5 border-r border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                  <Award className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Completed</p>
-                  <p className="text-2xl font-bold text-slate-900">{studentData.completedLevels.length}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-                  <BookOpen className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Focus Areas</p>
-                  <p className="text-2xl font-bold text-slate-900">{studentData.weakAreas.length}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Grid */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - 2/3 width */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Progress Overview */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-slate-900">Learning Progress</h3>
-                <span className="text-sm font-medium text-slate-500">{progressPercentage}% Complete</span>
+            {/* Avatar Gallery */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Choose Your Avatar
+                </label>
+                <button
+                  type="button"
+                  onClick={generateAvatarBatch}
+                  disabled={fetchingAvatars}
+                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${fetchingAvatars ? 'animate-spin' : ''}`} />
+                  New Set
+                </button>
               </div>
 
-              <div className="mb-6">
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-500"
-                    style={{ width: `${progressPercentage}%` }}
-                  ></div>
+              {fetchingAvatars ? (
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-4">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-12 h-12 mx-auto rounded-full bg-gray-200 animate-pulse"
+                    />
+                  ))}
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-slate-700 mb-3">Completed Levels</p>
-                <div className="grid grid-cols-5 gap-3">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
-                    const isCompleted = studentData.completedLevels.includes(level);
-                    const isCurrent = level === studentData.currentLevel;
+              ) : (
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-4">
+                  {currentAvatars.map(({ seed, svg }) => {
+                    const isSelected = selectedSeed === seed;
                     return (
-                      <div
-                        key={level}
-                        className={`
-                          relative aspect-square rounded-lg border-2 flex items-center justify-center font-bold text-sm
-                          ${isCompleted ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 
-                            isCurrent ? 'bg-blue-50 border-blue-500 text-blue-700' :
-                            'bg-slate-50 border-slate-200 text-slate-400'}
-                        `}
+                      <button
+                        key={seed}
+                        type="button"
+                        onClick={() => setSelectedSeed(seed)}
+                        className={`rounded-lg p-2 transition-all ${
+                          isSelected
+                            ? 'ring-2 ring-blue-500 bg-blue-50'
+                            : 'hover:bg-gray-100'
+                        }`}
+                        aria-label={`Select avatar ${seed}`}
                       >
-                        {level}
-                        {isCompleted && (
-                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs">✓</span>
-                          </div>
-                        )}
-                      </div>
+                        <div className="relative w-12 h-12 mx-auto">
+                          <div
+                            dangerouslySetInnerHTML={{ __html: svg }}
+                            className="w-full h-full"
+                          />
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full p-1">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
-              </div>
+              )}
+
+              <p className="mt-3 text-xs text-gray-500 text-center">
+                Click an avatar to select it
+              </p>
             </div>
 
-            {/* Focus Areas */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-amber-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900">Areas for Improvement</h3>
-              </div>
-              
-              <div className="space-y-3">
-                {studentData.weakAreas.map((area, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                      <span className="text-sm font-medium text-slate-700">
-                        {area.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500 px-3 py-1 bg-white rounded-full border border-slate-200">
-                      In Progress
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - 1/3 width */}
-          <div className="space-y-6">
-            {/* Activity Log */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900">Activity Log</h3>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="relative pl-6 pb-4 border-l-2 border-slate-200">
-                  <div className="absolute -left-1.5 top-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">MOST RECENT</p>
-                  <p className="text-sm font-semibold text-slate-900 mb-1">Profile Updated</p>
-                  <p className="text-xs text-slate-600">{studentData.lastUpdated}</p>
-                </div>
-                
-                <div className="relative pl-6">
-                  <div className="absolute -left-1.5 top-0 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">ENROLLED</p>
-                  <p className="text-sm font-semibold text-slate-900 mb-1">Account Created</p>
-                  <p className="text-xs text-slate-600">{studentData.createdAt}</p>
-                  {studentData.firstLogin && (
-                    <span className="inline-block mt-2 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded border border-blue-200">
-                      First Login Complete
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Teacher Assignment */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                  <GraduationCap className="w-5 h-5 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900">Teacher</h3>
-              </div>
-              
-              <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Assigned Teacher ID</p>
-                <p className="font-mono text-xs text-slate-700 break-all">{studentData.teacherId}</p>
-              </div>
-            </div>
-          </div>
+            <button
+              type="submit"
+              disabled={loading || !nickname.trim() || !selectedSeed}
+              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition ${
+                loading || !nickname.trim() || !selectedSeed
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+              }`}
+            >
+              {loading ? 'Saving profile...' : 'Save Profile'}
+            </button>
+          </form>
         </div>
       </div>
     </div>

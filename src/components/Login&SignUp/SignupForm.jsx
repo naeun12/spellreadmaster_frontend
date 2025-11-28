@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, db, doc, setDoc } from '../../firebase';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { auth, db } from '../../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 const SignupForm = ({ onSwitchToLogin }) => {
@@ -14,54 +15,60 @@ const SignupForm = ({ onSwitchToLogin }) => {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    setError('');
+
     if (password !== confirmPassword) {
       setError("Passwords don't match");
       return;
     }
 
+    if (password.length < 6) {
+      setError("Password should be at least 6 characters");
+      return;
+    }
+
     try {
+      // Step 1: Create user account
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Generate teacher ID
+      // Step 2: Send verification email
+      await sendEmailVerification(user);
+
+      // Step 3: Generate teacher ID
       const teacherId = 'T' + Date.now().toString().slice(-8);
 
-      // Save teacher info to Firestore with "Pending" status
+      // Step 4: Save teacher info to Firestore (NO status field)
       await setDoc(doc(db, 'teachers', user.uid), {
         fullName,
         email,
         teacherId,
         role: 'teacher',
-        status: 'Pending', // ← New teachers start as "Pending"
+        emailVerified: false,
         createdAt: new Date()
       });
 
       // Show success popup
       setShowSuccess(true);
 
-      // Redirect to pending page after 2 seconds
-      setTimeout(() => {
-        setShowSuccess(false);
-        navigate('/teacher-pending', {
-          state: {
-            status: 'Pending',
-            message: 'Your account has been created successfully! Please wait for admin approval before you can access the system.'
-          }
-        });
-      }, 2000);
     } catch (err) {
       console.error("Error during signup:", err);
 
-      if (err.code === 'permission-denied') {
-        setError("Permission denied. Please check Firestore rules.");
-      } else if (err.code === 'auth/email-already-in-use') {
+      if (err.code === 'auth/email-already-in-use') {
         setError("This email is already registered.");
       } else if (err.code === 'auth/weak-password') {
         setError("Password should be at least 6 characters.");
+      } else if (err.code === 'auth/invalid-email') {
+        setError("Invalid email address.");
       } else {
-        setError(err.message);
+        setError(err.message || "An error occurred during signup.");
       }
     }
+  };
+
+  const handleContinue = () => {
+    setShowSuccess(false);
+    onSwitchToLogin(); // Switch back to login form
   };
 
   return (
@@ -69,33 +76,36 @@ const SignupForm = ({ onSwitchToLogin }) => {
       {/* Success Popup Modal */}
       {showSuccess && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-md shadow-lg max-w-sm w-full text-center">
-            <div className="mb-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+          <div className="bg-white p-6 rounded-md shadow-lg max-w-md w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">✓</span>
               </div>
+              <h3 className="text-xl font-semibold text-green-600 mb-3">Account Created!</h3>
+              
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 font-semibold mb-2">
+                  📧 Verification Email Sent
+                </p>
+                <p className="text-xs text-blue-700 mb-2">
+                  We've sent a verification link to <strong>{email}</strong>
+                </p>
+                <p className="text-xs text-blue-600">
+                  Please check your inbox and click the link to verify your email.
+                </p>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                Once verified, you can log in and access your account immediately!
+              </p>
+              
+              <button
+                onClick={handleContinue}
+                className="w-full px-4 py-2 bg-[#fcb436] text-white rounded-md hover:bg-[#e0a230] transition"
+              >
+                Go to Login
+              </button>
             </div>
-            <h3 className="text-xl font-semibold text-green-600">Account Created!</h3>
-            <p className="mt-2 text-gray-700">
-              Your registration is pending admin approval.
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              You will be notified once your account is approved.
-            </p>
-            <button
-              onClick={() => {
-                setShowSuccess(false);
-                navigate('/teacher-pending', {
-                  state: {
-                    status: 'Pending',
-                    message: 'Your account has been created successfully! Please wait for admin approval.'
-                  }
-                });
-              }}
-              className="mt-4 px-4 py-2 bg-[#fcb436] text-white rounded-md hover:bg-[#e0a230] transition"
-            >
-              Continue
-            </button>
           </div>
         </div>
       )}
@@ -106,8 +116,8 @@ const SignupForm = ({ onSwitchToLogin }) => {
           <p className="text-red-600 text-sm">{error}</p>
         </div>
       )}
+      
       <form onSubmit={handleSignup} className="space-y-4">
-        {/* Full Name */}
         <div>
           <label className="block text-sm font-medium mb-1">Full Name</label>
           <input
@@ -120,7 +130,6 @@ const SignupForm = ({ onSwitchToLogin }) => {
           />
         </div>
 
-        {/* Email (used as username here) */}
         <div>
           <label className="block text-sm font-medium mb-1">Email</label>
           <input
@@ -133,7 +142,6 @@ const SignupForm = ({ onSwitchToLogin }) => {
           />
         </div>
 
-        {/* Password */}
         <div>
           <label className="block text-sm font-medium mb-1">Password</label>
           <input
@@ -147,7 +155,6 @@ const SignupForm = ({ onSwitchToLogin }) => {
           />
         </div>
 
-        {/* Confirm Password */}
         <div>
           <label className="block text-sm font-medium mb-1">Confirm Password</label>
           <input
@@ -160,7 +167,6 @@ const SignupForm = ({ onSwitchToLogin }) => {
           />
         </div>
 
-        {/* Submit Button */}
         <button
           type="submit"
           className="w-full bg-[#fcb436] text-white font-semibold py-2 rounded-md hover:bg-[#e0a230] transition"
@@ -169,14 +175,12 @@ const SignupForm = ({ onSwitchToLogin }) => {
         </button>
       </form>
 
-      {/* Info Box */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
         <p className="text-xs text-blue-800">
-          ℹ️ Your account will be reviewed by an administrator before you can access the system.
+          ℹ️ Please verify your email after signup before logging in.
         </p>
       </div>
 
-      {/* Switch to Login Link */}
       <div className="mt-4 text-center">
         <p>
           Already have an account?{' '}

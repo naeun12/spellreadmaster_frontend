@@ -12,12 +12,11 @@ const Header = () => {
   const [studentData, setStudentData] = useState({
     name: "Student",
     grade: "Grade 1",
-    avatar: "👧",
-    totalPoints: 0,
-    level: 1,
+    avatar: "",
+    completedLevels: [], // ✅ Added
+    currentLevel: 1,     // ✅ Matches LBLM
   });
 
-  // Fetch student data from Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -25,12 +24,15 @@ const Header = () => {
           const studentDoc = await getDoc(doc(db, 'students', user.uid));
           if (studentDoc.exists()) {
             const data = studentDoc.data();
+            // ✅ Extract LBLM-relevant fields
+            const completedLevels = data.completedLevels || [];
+            const currentLevel = data.currentLevel || 1;
             setStudentData({
               name: data.fullName || data.name || "Student",
               grade: data.grade || "Grade 1",
               avatar: data.avatar || "👧",
-              totalPoints: data.totalPoints || 0,
-              level: data.level || 1,
+              completedLevels, // ✅ Used for totalPoints
+              currentLevel,    // ✅ Used for Level display
             });
           }
         } catch (error) {
@@ -41,6 +43,9 @@ const Header = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // ✅ Compute adaptive totalPoints
+  const totalPoints = studentData.completedLevels.length * 3;
 
   const handleLogout = () => {
     setShowModal(true);
@@ -61,10 +66,9 @@ const Header = () => {
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* This is the key fix - render SVG properly in Header */}
               <div className="text-3xl">
                 {studentData.avatar.startsWith('<svg') ? (
-                  <div className="inline-block" style={{ width: '48px', height: '48px' }}>
+                  <div className="inline-block w-12 h-12 rounded-xl shadow-md overflow-hidden border-2 border-white/20">
                     <svg
                       dangerouslySetInnerHTML={{ __html: studentData.avatar.replace(/<svg[^>]*>/, '<svg>') }}
                       width="48"
@@ -73,10 +77,11 @@ const Header = () => {
                     />
                   </div>
                 ) : (
-                  <span>{studentData.avatar}</span>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-md bg-white/20 border-2 border-white/20">
+                    {studentData.avatar}
+                  </div>
                 )}
               </div>
-              
               <div className="text-white">
                 <div className="text-lg font-bold">{studentData.name}</div>
                 <div className="text-sm opacity-90">{studentData.grade}</div>
@@ -86,15 +91,12 @@ const Header = () => {
             <div className="flex items-center space-x-6 text-white">
               <div className="flex items-center space-x-2">
                 <Star className="w-5 h-5 fill-current text-yellow-200" />
-                <span className="font-bold">{studentData.totalPoints}</span>
+                <span className="font-bold">{totalPoints}</span> {/* ✅ Adaptive */}
               </div>
               <div className="flex items-center space-x-2">
                 <Trophy className="w-5 h-5 text-yellow-200" />
-                <span className="font-bold">Level {studentData.level}</span>
+                <span className="font-bold">Level {studentData.currentLevel}</span> {/* ✅ LBLM current level */}
               </div>
-              <button className="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full p-2 transition-colors">
-                <Volume2 className="w-5 h-5" />
-              </button>
               <div className="w-px h-6 bg-white opacity-30"></div>
               <button
                 onClick={handleLogout}

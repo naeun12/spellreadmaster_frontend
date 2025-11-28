@@ -11,7 +11,7 @@ const TeacherLayout = ({ children }) => {
       {/* Sidebar + Main Content */}
       <div className="flex">
         <Sidebar/>
-        <div className="flex-1 ml-14 mt-14 mb-10 md:ml-64 p-4">
+        <div className="flex-1 ml-14 mt-14 mb-2 md:ml-64 p-4">
           {children}
         </div>
       </div>

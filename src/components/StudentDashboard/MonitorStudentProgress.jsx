@@ -7,6 +7,7 @@ export default function MonitorStudentProgress() {
   const [loading, setLoading] = useState(true);
   const [studentData, setStudentData] = useState(null);
   const [activityData, setActivityData] = useState([]);
+  const [selectedMode, setSelectedMode] = useState('all');
   const [stats, setStats] = useState({
     averageScore: 0,
     highestScore: 0,
@@ -14,6 +15,11 @@ export default function MonitorStudentProgress() {
     passedQuizzes: 0,
     failedQuizzes: 0,
     weakAreas: []
+  });
+  const [modeStats, setModeStats] = useState({
+    LBLM: { count: 0, avgScore: 0, bestScore: 0, passed: 0 },
+    TLM: { count: 0, avgScore: 0, bestScore: 0, passed: 0 },
+    story: { count: 0, avgScore: 0, bestScore: 0, passed: 0 }
   });
 
   useEffect(() => {
@@ -66,6 +72,11 @@ export default function MonitorStudentProgress() {
         failedQuizzes: 0,
         weakAreas: []
       });
+      setModeStats({
+        LBLM: { count: 0, avgScore: 0, bestScore: 0, passed: 0 },
+        TLM: { count: 0, avgScore: 0, bestScore: 0, passed: 0 },
+        story: { count: 0, avgScore: 0, bestScore: 0, passed: 0 }
+      });
       return;
     }
 
@@ -74,6 +85,34 @@ export default function MonitorStudentProgress() {
     const highestScore = Math.max(...activities.map(act => act.percentage || 0));
     const passedQuizzes = activities.filter(act => (act.percentage || 0) >= 60).length;
     const failedQuizzes = activities.filter(act => (act.percentage || 0) < 60).length;
+
+    // Calculate mode-specific stats
+    const modeStatsCalc = {
+      LBLM: { count: 0, avgScore: 0, bestScore: 0, passed: 0 },
+      TLM: { count: 0, avgScore: 0, bestScore: 0, passed: 0 },
+      story: { count: 0, avgScore: 0, bestScore: 0, passed: 0 }
+    };
+
+    activities.forEach(activity => {
+      const mode = activity.mode;
+      if (modeStatsCalc[mode]) {
+        modeStatsCalc[mode].count++;
+        modeStatsCalc[mode].avgScore += activity.percentage || 0;
+        modeStatsCalc[mode].bestScore = Math.max(modeStatsCalc[mode].bestScore, activity.percentage || 0);
+        if ((activity.percentage || 0) >= 60) {
+          modeStatsCalc[mode].passed++;
+        }
+      }
+    });
+
+    // Calculate averages
+    Object.keys(modeStatsCalc).forEach(mode => {
+      if (modeStatsCalc[mode].count > 0) {
+        modeStatsCalc[mode].avgScore = Math.round(modeStatsCalc[mode].avgScore / modeStatsCalc[mode].count);
+      }
+    });
+
+    setModeStats(modeStatsCalc);
 
     // Analyze weak areas based on incorrect answers
     const weakAreaMap = {};
@@ -138,6 +177,28 @@ export default function MonitorStudentProgress() {
     }
   };
 
+  const getModeName = (mode) => {
+    switch (mode) {
+      case 'LBLM': return 'Level-Based';
+      case 'TLM': return 'Thematic';
+      case 'story': return 'Story Mode';
+      default: return 'All Activities';
+    }
+  };
+
+  const filteredActivities = selectedMode === 'all' 
+    ? activityData 
+    : activityData.filter(act => act.mode === selectedMode);
+
+  const currentStats = selectedMode === 'all' ? stats : {
+    averageScore: modeStats[selectedMode]?.avgScore || 0,
+    highestScore: modeStats[selectedMode]?.bestScore || 0,
+    totalQuizzes: modeStats[selectedMode]?.count || 0,
+    passedQuizzes: modeStats[selectedMode]?.passed || 0,
+    failedQuizzes: (modeStats[selectedMode]?.count || 0) - (modeStats[selectedMode]?.passed || 0),
+    weakAreas: stats.weakAreas
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
@@ -178,6 +239,59 @@ export default function MonitorStudentProgress() {
           <p className="text-gray-600">Track your spelling journey!</p>
         </div>
 
+        {/* Mode Filter Tabs */}
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-2 flex gap-2 flex-wrap">
+          <button
+            onClick={() => setSelectedMode('all')}
+            className={`flex-1 min-w-[140px] px-4 py-3 rounded-md font-medium transition-all ${
+              selectedMode === 'all'
+                ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            ✨ All Activities
+          </button>
+          <button
+            onClick={() => setSelectedMode('LBLM')}
+            className={`flex-1 min-w-[140px] px-4 py-3 rounded-md font-medium transition-all ${
+              selectedMode === 'LBLM'
+                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            🌟 Level-Based
+            {modeStats.LBLM.count > 0 && (
+              <span className="ml-2 text-xs opacity-80">({modeStats.LBLM.count})</span>
+            )}
+          </button>
+          <button
+            onClick={() => setSelectedMode('TLM')}
+            className={`flex-1 min-w-[140px] px-4 py-3 rounded-md font-medium transition-all ${
+              selectedMode === 'TLM'
+                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            📚 Thematic
+            {modeStats.TLM.count > 0 && (
+              <span className="ml-2 text-xs opacity-80">({modeStats.TLM.count})</span>
+            )}
+          </button>
+          <button
+            onClick={() => setSelectedMode('story')}
+            className={`flex-1 min-w-[140px] px-4 py-3 rounded-md font-medium transition-all ${
+              selectedMode === 'story'
+                ? 'bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            📖 Story Mode
+            {modeStats.story.count > 0 && (
+              <span className="ml-2 text-xs opacity-80">({modeStats.story.count})</span>
+            )}
+          </button>
+        </div>
+
         {/* Compact Stats Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Level */}
@@ -213,7 +327,7 @@ export default function MonitorStudentProgress() {
               <TrendingUp className="w-5 h-5 text-blue-600" />
               <p className="text-gray-600 text-sm">Avg Score</p>
             </div>
-            <p className="text-3xl font-bold text-blue-600">{stats.averageScore}%</p>
+            <p className="text-3xl font-bold text-blue-600">{currentStats.averageScore}%</p>
           </div>
         </div>
 
@@ -246,23 +360,23 @@ export default function MonitorStudentProgress() {
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <Award className="w-5 h-5 text-yellow-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-yellow-600">{stats.highestScore}%</p>
+                <p className="text-2xl font-bold text-yellow-600">{currentStats.highestScore}%</p>
                 <p className="text-xs text-gray-600 mt-1">Best</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <CheckCircle className="w-5 h-5 text-green-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-green-600">{stats.passedQuizzes}</p>
+                <p className="text-2xl font-bold text-green-600">{currentStats.passedQuizzes}</p>
                 <p className="text-xs text-gray-600 mt-1">Passed</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <XCircle className="w-5 h-5 text-red-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-red-600">{stats.failedQuizzes}</p>
+                <p className="text-2xl font-bold text-red-600">{currentStats.failedQuizzes}</p>
                 <p className="text-xs text-gray-600 mt-1">Retry</p>
               </div>
             </div>
             
             <div className="text-center text-sm text-gray-600 pt-3 border-t border-gray-200">
-              Total: <span className="font-bold text-gray-900">{stats.totalQuizzes}</span> quizzes
+              Total: <span className="font-bold text-gray-900">{currentStats.totalQuizzes}</span> quizzes
             </div>
           </div>
 
@@ -273,9 +387,9 @@ export default function MonitorStudentProgress() {
               <h3 className="font-bold text-gray-900 text-lg">Focus On</h3>
             </div>
             
-            {stats.weakAreas.length > 0 ? (
+            {currentStats.weakAreas.length > 0 ? (
               <div className="space-y-3">
-                {stats.weakAreas.slice(0, 3).map((area, i) => (
+                {currentStats.weakAreas.slice(0, 3).map((area, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-900 text-sm font-medium">{area.area}</span>
@@ -284,7 +398,7 @@ export default function MonitorStudentProgress() {
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full"
-                        style={{ width: `${Math.min((area.count / Math.max(...stats.weakAreas.map(a => a.count))) * 100, 100)}%` }}
+                        style={{ width: `${Math.min((area.count / Math.max(...currentStats.weakAreas.map(a => a.count))) * 100, 100)}%` }}
                       ></div>
                     </div>
                   </div>
@@ -304,12 +418,14 @@ export default function MonitorStudentProgress() {
         <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-6 hover:shadow-md transition-all">
           <div className="flex items-center gap-2 mb-4">
             <Book className="w-6 h-6 text-pink-600" />
-            <h3 className="font-bold text-gray-900 text-lg">Recent Activity</h3>
+            <h3 className="font-bold text-gray-900 text-lg">
+              Recent Activity {selectedMode !== 'all' && `- ${getModeName(selectedMode)}`}
+            </h3>
           </div>
 
-          {activityData.length > 0 ? (
+          {filteredActivities.length > 0 ? (
             <div className="space-y-3">
-              {activityData.slice(0, 5).map((activity, i) => (
+              {filteredActivities.slice(0, 5).map((activity, i) => (
                 <div key={i} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-all border border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -334,7 +450,9 @@ export default function MonitorStudentProgress() {
           ) : (
             <div className="text-center py-12">
               <Book className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-900 text-base font-medium">No activity yet</p>
+              <p className="text-gray-900 text-base font-medium">
+                {selectedMode === 'all' ? 'No activity yet' : `No ${getModeName(selectedMode)} activity yet`}
+              </p>
               <p className="text-gray-600 text-sm mt-1">Start practicing to see your progress here!</p>
             </div>
           )}

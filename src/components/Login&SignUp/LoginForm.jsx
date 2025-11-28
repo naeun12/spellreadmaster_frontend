@@ -33,6 +33,7 @@ const LoginForm = ({ onSwitchToSignup }) => {
       // Step 3: Check if it's a teacher
       const teacherDoc = await getDoc(doc(db, 'teachers', user.uid));
       if (teacherDoc.exists()) {
+        localStorage.setItem('teacherPassword', passwordToUse);
         return navigate('/TeacherPage');
       }
 
